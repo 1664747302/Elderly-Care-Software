@@ -25,6 +25,33 @@ class AppSettings(context: Context) {
         get() = preferences.getLong(KEY_LAST_REMINDER_AT, 0L)
         set(value) = preferences.edit().putLong(KEY_LAST_REMINDER_AT, value).apply()
 
+    var curfewEnabled: Boolean
+        get() = preferences.getBoolean(KEY_CURFEW_ENABLED, false)
+        set(value) = preferences.edit().putBoolean(KEY_CURFEW_ENABLED, value).apply()
+
+    var curfewStartHour: Int
+        get() = preferences.getInt(KEY_CURFEW_START_HOUR, 22)
+        set(value) = preferences.edit().putInt(KEY_CURFEW_START_HOUR, value.coerceIn(0, 23)).apply()
+
+    var curfewEndHour: Int
+        get() = preferences.getInt(KEY_CURFEW_END_HOUR, 6)
+        set(value) = preferences.edit().putInt(KEY_CURFEW_END_HOUR, value.coerceIn(0, 23)).apply()
+
+    fun isCurfewActive(nowMillis: Long): Boolean {
+        if (!curfewEnabled) return false
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = nowMillis }
+        val hour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+        
+        val start = curfewStartHour
+        val end = curfewEndHour
+        
+        return if (start < end) {
+            hour in start until end
+        } else {
+            hour >= start || hour < end
+        }
+    }
+
     companion object {
         const val DEFAULT_PIN = "1234"
         const val DEFAULT_REMINDER_MINUTES = 30
@@ -35,5 +62,8 @@ class AppSettings(context: Context) {
         private const val KEY_VOICE_ENABLED = "voice_enabled"
         private const val KEY_REMINDER_TEXT = "reminder_text"
         private const val KEY_LAST_REMINDER_AT = "last_reminder_at"
+        private const val KEY_CURFEW_ENABLED = "curfew_enabled"
+        private const val KEY_CURFEW_START_HOUR = "curfew_start_hour"
+        private const val KEY_CURFEW_END_HOUR = "curfew_end_hour"
     }
 }

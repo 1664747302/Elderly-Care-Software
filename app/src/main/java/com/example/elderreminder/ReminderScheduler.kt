@@ -16,6 +16,17 @@ object ReminderScheduler {
             ExistingPeriodicWorkPolicy.UPDATE,
             request,
         )
+
+        // 如果当前正好在在宵禁时间域内，立即启动一次单次轮询链条
+        val settings = AppSettings(context)
+        if (settings.isCurfewActive(System.currentTimeMillis())) {
+            val curfewRequest = androidx.work.OneTimeWorkRequestBuilder<UsageReminderWorker>().build()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                "elder_usage_reminder_curfew",
+                androidx.work.ExistingWorkPolicy.REPLACE,
+                curfewRequest
+            )
+        }
     }
 
     fun cancel(context: Context) {

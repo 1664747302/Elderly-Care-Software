@@ -18,6 +18,9 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var reminderTextInput: EditText
     private lateinit var pinInput: EditText
     private lateinit var voiceCheckbox: CheckBox
+    private lateinit var curfewCheckbox: CheckBox
+    private lateinit var curfewStartInput: EditText
+    private lateinit var curfewEndInput: EditText
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,6 +48,22 @@ class SettingsActivity : AppCompatActivity() {
         }
         root.addView(voiceCheckbox)
 
+        root.addView(label("深夜防沉迷 (夜间宵禁)"))
+        curfewCheckbox = CheckBox(this).apply {
+            text = "启用夜间宵禁限制"
+            textSize = 20f
+            isChecked = settings.curfewEnabled
+        }
+        root.addView(curfewCheckbox)
+
+        root.addView(label("宵禁起始时间 (24小时制小时阶，例如 22)"))
+        curfewStartInput = editText(settings.curfewStartHour.toString(), InputType.TYPE_CLASS_NUMBER)
+        root.addView(curfewStartInput)
+
+        root.addView(label("宵禁截止时间 (24小时制小时阶，例如 6)"))
+        curfewEndInput = editText(settings.curfewEndHour.toString(), InputType.TYPE_CLASS_NUMBER)
+        root.addView(curfewEndInput)
+
         root.addView(label("提醒文案"))
         reminderTextInput = editText(settings.reminderText, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE)
         reminderTextInput.minLines = 3
@@ -71,9 +90,14 @@ class SettingsActivity : AppCompatActivity() {
     private fun saveSettings() {
         val minutes = reminderMinutesInput.text.toString().toIntOrNull() ?: AppSettings.DEFAULT_REMINDER_MINUTES
         val pin = pinInput.text.toString().ifBlank { AppSettings.DEFAULT_PIN }
+        val startHour = curfewStartInput.text.toString().toIntOrNull() ?: 22
+        val endHour = curfewEndInput.text.toString().toIntOrNull() ?: 6
 
         settings.reminderMinutes = minutes
         settings.voiceEnabled = voiceCheckbox.isChecked
+        settings.curfewEnabled = curfewCheckbox.isChecked
+        settings.curfewStartHour = startHour
+        settings.curfewEndHour = endHour
         settings.reminderText = reminderTextInput.text.toString()
         settings.pin = pin
         ReminderScheduler.schedule(this)
