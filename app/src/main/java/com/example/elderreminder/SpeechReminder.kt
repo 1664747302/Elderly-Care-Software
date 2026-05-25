@@ -11,10 +11,10 @@ object SpeechReminder : TextToSpeech.OnInitListener {
     private var pendingMessage: String? = null
     private var mediaPlayer: MediaPlayer? = null
 
-    fun speak(context: Context, message: String) {
+    fun speak(context: Context, message: String, isCurfew: Boolean) {
         val settings = AppSettings(context)
         if (settings.customAudioEnabled) {
-            val audioFile = getCustomAudioFile(context)
+            val audioFile = getCustomAudioFile(context, isCurfew)
             if (audioFile.exists()) {
                 playAudioFile(audioFile.absolutePath)
                 return
@@ -31,8 +31,23 @@ object SpeechReminder : TextToSpeech.OnInitListener {
         }
     }
 
-    fun getCustomAudioFile(context: Context): File {
-        return File(context.filesDir, "custom_reminder.3gp")
+    fun getCustomAudioFile(context: Context, isCurfew: Boolean): File {
+        return getCustomAudioFile(context.filesDir, isCurfew)
+    }
+
+    fun getCustomAudioFile(filesDir: File, isCurfew: Boolean): File {
+        if (isCurfew) {
+            return File(filesDir, "custom_reminder_curfew.3gp")
+        } else {
+            val regular = File(filesDir, "custom_reminder_regular.3gp")
+            if (!regular.exists()) {
+                val old = File(filesDir, "custom_reminder.3gp")
+                if (old.exists()) {
+                    return old
+                }
+            }
+            return regular
+        }
     }
 
     private fun playAudioFile(path: String) {

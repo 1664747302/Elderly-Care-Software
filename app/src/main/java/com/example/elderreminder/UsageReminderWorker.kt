@@ -39,7 +39,7 @@ class UsageReminderWorker(
 
                 ReminderNotifier(applicationContext).show(reminderText)
                 if (settings.voiceEnabled) {
-                    SpeechReminder.speak(applicationContext, reminderText)
+                    SpeechReminder.speak(applicationContext, reminderText, isCurfew)
                 }
                 settings.lastReminderAtMillis = now
                 

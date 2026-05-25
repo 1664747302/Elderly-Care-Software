@@ -51,13 +51,7 @@ class MainActivity : AppCompatActivity() {
             textSize = 31f
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.brand_green_dark))
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-        })
-
-        root.addView(TextView(this).apply {
-            text = "连续使用手机约 ${settings.reminderMinutes} 分钟后，会提醒爷爷休息。"
-            textSize = 19f
-            setTextColor(0xFF333333.toInt())
-            setPadding(0, dp(8), 0, dp(18))
+            setPadding(0, 0, 0, dp(18))
         })
 
         val panel = LinearLayout(this).apply {
@@ -81,10 +75,6 @@ class MainActivity : AppCompatActivity() {
             LinearLayout.LayoutParams.WRAP_CONTENT,
         ).apply { bottomMargin = dp(18) })
 
-        root.addView(primaryButton("开启使用情况权限") {
-            startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-        })
-
         root.addView(primaryButton("开始提醒") {
             if (!UsagePermission.hasUsageAccess(this)) {
                 Toast.makeText(this, "请先开启使用情况访问权限", Toast.LENGTH_LONG).show()
@@ -106,12 +96,6 @@ class MainActivity : AppCompatActivity() {
             showPinDialog {
                 startActivity(Intent(this, ReportActivity::class.java))
             }
-        })
-
-        root.addView(secondaryButton("系统通知设置") {
-            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                .setData(Uri.parse("package:$packageName"))
-            startActivity(intent)
         })
 
         return ScrollView(this).apply {
@@ -152,7 +136,7 @@ class MainActivity : AppCompatActivity() {
         detailText.text = if (hasUsageAccess) {
             "点击“开始提醒”后，应用会在后台定期检查使用情况，并在长时间使用时发出通知和语音提醒。"
         } else {
-            "Android 不允许应用自动开启使用情况权限。请点击上方按钮，在系统页面中允许“护眼休息提醒”。"
+            "Android 不允许应用自动开启使用情况权限。请进入“家人设置”开启相关权限。"
         }
     }
 

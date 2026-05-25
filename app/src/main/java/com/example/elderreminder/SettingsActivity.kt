@@ -16,6 +16,9 @@ import android.media.MediaRecorder
 import android.media.MediaPlayer
 import android.content.pm.PackageManager
 import androidx.core.app.ActivityCompat
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 
 class SettingsActivity : AppCompatActivity() {
     private lateinit var settings: AppSettings
@@ -28,19 +31,25 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var curfewEndInput: EditText
     
     private lateinit var customAudioCheckbox: CheckBox
-    private lateinit var recordButton: Button
-    private lateinit var playButton: Button
+    private lateinit var recordRegularButton: Button
+    private lateinit var playRegularButton: Button
+    private lateinit var recordCurfewButton: Button
+    private lateinit var playCurfewButton: Button
     
     private var mediaRecorder: MediaRecorder? = null
     private var mediaPlayer: MediaPlayer? = null
     private var isRecording = false
     private var isPlaying = false
-    private lateinit var audioFile: File
+    private lateinit var regularAudioFile: File
+    private lateinit var curfewAudioFile: File
+    private var currentRecordingFile: File? = null
+    private var currentPlayingFile: File? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         settings = AppSettings(this)
-        audioFile = SpeechReminder.getCustomAudioFile(this)
+        regularAudioFile = SpeechReminder.getCustomAudioFile(this, isCurfew = false)
+        curfewAudioFile = SpeechReminder.getCustomAudioFile(this, isCurfew = true)
         setContentView(buildContent())
     }
 
@@ -73,26 +82,51 @@ class SettingsActivity : AppCompatActivity() {
         }
         root.addView(customAudioCheckbox)
 
-        val recordPanel = LinearLayout(this).apply {
+        // 常规提醒录音面板
+        root.addView(subLabel("连续使用常规提醒录音："))
+        val regularPanel = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
         }
 
-        recordButton = Button(this).apply {
-            text = "开始录音"
+        recordRegularButton = Button(this).apply {
+            text = "录制常规录音"
             textSize = 18f
-            setOnClickListener { toggleRecording() }
+            setOnClickListener { toggleRecording(isCurfew = false) }
         }
-        recordPanel.addView(recordButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { rightMargin = dp(8) })
+        regularPanel.addView(recordRegularButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { rightMargin = dp(8) })
 
-        playButton = Button(this).apply {
-            text = "播放录音"
+        playRegularButton = Button(this).apply {
+            text = "播放常规录音"
             textSize = 18f
-            isEnabled = audioFile.exists()
-            setOnClickListener { togglePlayback() }
+            isEnabled = regularAudioFile.exists()
+            setOnClickListener { togglePlayback(isCurfew = false) }
         }
-        recordPanel.addView(playButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        regularPanel.addView(playRegularButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         
-        root.addView(recordPanel)
+        root.addView(regularPanel)
+
+        // 宵禁提醒录音面板
+        root.addView(subLabel("宵禁限制提醒录音："))
+        val curfewPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+
+        recordCurfewButton = Button(this).apply {
+            text = "录制宵禁录音"
+            textSize = 18f
+            setOnClickListener { toggleRecording(isCurfew = true) }
+        }
+        curfewPanel.addView(recordCurfewButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { rightMargin = dp(8) })
+
+        playCurfewButton = Button(this).apply {
+            text = "播放宵禁录音"
+            textSize = 18f
+            isEnabled = curfewAudioFile.exists()
+            setOnClickListener { togglePlayback(isCurfew = true) }
+        }
+        curfewPanel.addView(playCurfewButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        
+        root.addView(curfewPanel)
 
         // 防杀保活教程面板
         root.addView(label("后台防杀/保活配置教程"))
@@ -109,6 +143,33 @@ class SettingsActivity : AppCompatActivity() {
             setPadding(dp(12), dp(10), dp(12), dp(10))
         }
         root.addView(tutorialText)
+
+        root.addView(label("系统使用权限设置"))
+        root.addView(Button(this).apply {
+            text = "开启使用情况权限"
+            textSize = 20f
+            setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.brand_green_dark))
+            setOnClickListener { 
+                startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+            }
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply { bottomMargin = dp(12) })
+
+        root.addView(Button(this).apply {
+            text = "系统通知设置"
+            textSize = 20f
+            setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.brand_green_dark))
+            setOnClickListener { 
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(Uri.parse("package:$packageName"))
+                startActivity(intent)
+            }
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply { bottomMargin = dp(12) })
 
         root.addView(label("深夜防沉迷 (夜间宵禁)"))
         curfewCheckbox = CheckBox(this).apply {
@@ -169,32 +230,49 @@ class SettingsActivity : AppCompatActivity() {
         finish()
     }
 
-    private fun toggleRecording() {
-        if (!isRecording) {
+    private fun toggleRecording(isCurfew: Boolean) {
+        if (isRecording) {
+            val targetFile = if (isCurfew) curfewAudioFile else regularAudioFile
+            if (currentRecordingFile == targetFile) {
+                stopRecording()
+            } else {
+                Toast.makeText(this, "有其他录音正在进行", Toast.LENGTH_SHORT).show()
+            }
+        } else {
             // 请求麦克风录音权限
             if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.RECORD_AUDIO), 101)
+                ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.RECORD_AUDIO), if (isCurfew) 102 else 101)
                 return
             }
-            startRecording()
-        } else {
-            stopRecording()
+            startRecording(isCurfew)
         }
     }
 
-    private fun startRecording() {
+    private fun startRecording(isCurfew: Boolean) {
+        val file = if (isCurfew) curfewAudioFile else regularAudioFile
         try {
             mediaRecorder = MediaRecorder().apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
-                setOutputFile(audioFile.absolutePath)
+                setOutputFile(file.absolutePath)
                 prepare()
                 start()
             }
             isRecording = true
-            recordButton.text = "停止录音"
-            playButton.isEnabled = false
+            currentRecordingFile = file
+            
+            if (isCurfew) {
+                recordCurfewButton.text = "停止录音"
+                recordRegularButton.isEnabled = false
+                playCurfewButton.isEnabled = false
+                playRegularButton.isEnabled = false
+            } else {
+                recordRegularButton.text = "停止录音"
+                recordCurfewButton.isEnabled = false
+                playRegularButton.isEnabled = false
+                playCurfewButton.isEnabled = false
+            }
             Toast.makeText(this, "正在录音，请贴近麦克风说话...", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             e.printStackTrace()
@@ -210,33 +288,55 @@ class SettingsActivity : AppCompatActivity() {
             }
             mediaRecorder = null
             isRecording = false
-            recordButton.text = "开始录音"
-            playButton.isEnabled = true
+            
+            currentRecordingFile = null
+            
+            recordRegularButton.text = "录制常规录音"
+            recordCurfewButton.text = "录制宵禁录音"
+            
+            recordRegularButton.isEnabled = true
+            recordCurfewButton.isEnabled = true
+            
+            playRegularButton.isEnabled = regularAudioFile.exists()
+            playCurfewButton.isEnabled = curfewAudioFile.exists()
+            
             Toast.makeText(this, "录音保存成功！", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    private fun togglePlayback() {
+    private fun togglePlayback(isCurfew: Boolean) {
         if (!isPlaying) {
-            startPlayback()
+            startPlayback(isCurfew)
         } else {
             stopPlayback()
         }
     }
 
-    private fun startPlayback() {
+    private fun startPlayback(isCurfew: Boolean) {
+        val file = if (isCurfew) curfewAudioFile else regularAudioFile
         try {
             mediaPlayer = MediaPlayer().apply {
-                setDataSource(audioFile.absolutePath)
+                setDataSource(file.absolutePath)
                 prepare()
                 start()
                 setOnCompletionListener { stopPlayback() }
             }
             isPlaying = true
-            playButton.text = "停止播放"
-            recordButton.isEnabled = false
+            currentPlayingFile = file
+            
+            if (isCurfew) {
+                playCurfewButton.text = "停止播放"
+                playRegularButton.isEnabled = false
+                recordCurfewButton.isEnabled = false
+                recordRegularButton.isEnabled = false
+            } else {
+                playRegularButton.text = "停止播放"
+                playCurfewButton.isEnabled = false
+                recordRegularButton.isEnabled = false
+                recordCurfewButton.isEnabled = false
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             Toast.makeText(this, "音频播放失败", Toast.LENGTH_SHORT).show()
@@ -251,10 +351,30 @@ class SettingsActivity : AppCompatActivity() {
             }
             mediaPlayer = null
             isPlaying = false
-            playButton.text = "播放录音"
-            recordButton.isEnabled = true
+            currentPlayingFile = null
+            
+            playRegularButton.text = "播放常规录音"
+            playCurfewButton.text = "播放宵禁录音"
+            
+            recordRegularButton.isEnabled = true
+            recordCurfewButton.isEnabled = true
+            playRegularButton.isEnabled = regularAudioFile.exists()
+            playCurfewButton.isEnabled = curfewAudioFile.exists()
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            if (requestCode == 101) {
+                startRecording(isCurfew = false)
+            } else if (requestCode == 102) {
+                startRecording(isCurfew = true)
+            }
+        } else {
+            Toast.makeText(this, "需要麦克风权限才能录音", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -279,6 +399,14 @@ class SettingsActivity : AppCompatActivity() {
             textSize = 19f
             setTextColor(0xFF333333.toInt())
             setPadding(0, dp(16), 0, dp(6))
+        }
+
+    private fun subLabel(text: String): TextView =
+        TextView(this).apply {
+            this.text = text
+            textSize = 16f
+            setTextColor(0xFF555555.toInt())
+            setPadding(dp(4), dp(8), 0, dp(4))
         }
 
     private fun editText(value: String, inputTypeValue: Int): EditText =
