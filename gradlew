@@ -2,7 +2,7 @@
 
 APP_HOME=$(cd "${0%/*}" && pwd -P) || exit
 APP_NAME=${0##*/}
-DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+DEFAULT_JVM_OPTS="-Xmx2048m -Xms512m"
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
 if [ -n "$JAVA_HOME" ] ; then

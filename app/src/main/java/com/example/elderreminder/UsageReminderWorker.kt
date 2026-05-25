@@ -31,6 +31,14 @@ class UsageReminderWorker(
                 SpeechReminder.speak(applicationContext, settings.reminderText)
             }
             settings.lastReminderAtMillis = now
+            
+            // 写入本地数据库，用于生成习惯周报
+            try {
+                val db = ReminderHistoryDbHelper(applicationContext)
+                db.insertReminder(now, session.packageName ?: "未知", settings.reminderMinutes)
+            } catch (e: java.lang.Exception) {
+                e.printStackTrace()
+            }
         }
 
         return Result.success()

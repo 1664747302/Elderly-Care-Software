@@ -97,7 +97,15 @@ class MainActivity : AppCompatActivity() {
         })
 
         root.addView(secondaryButton("家人设置") {
-            showPinDialog()
+            showPinDialog {
+                startActivity(Intent(this, SettingsActivity::class.java))
+            }
+        })
+
+        root.addView(secondaryButton("视力与习惯周报") {
+            showPinDialog {
+                startActivity(Intent(this, ReportActivity::class.java))
+            }
         })
 
         root.addView(secondaryButton("系统通知设置") {
@@ -148,7 +156,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showPinDialog() {
+    private fun showPinDialog(onSuccess: () -> Unit) {
         val input = EditText(this).apply {
             gravity = Gravity.CENTER
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
@@ -157,13 +165,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         AlertDialog.Builder(this)
-            .setTitle("家人设置")
+            .setTitle("家人验证")
             .setMessage("请输入家人 PIN。默认 PIN 是 1234。")
             .setView(input)
             .setNegativeButton("取消", null)
             .setPositiveButton("进入") { _, _ ->
                 if (input.text.toString() == settings.pin) {
-                    startActivity(Intent(this, SettingsActivity::class.java))
+                    onSuccess()
                 } else {
                     Toast.makeText(this, "PIN 不正确", Toast.LENGTH_SHORT).show()
                 }
