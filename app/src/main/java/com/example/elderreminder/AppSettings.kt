@@ -25,6 +25,10 @@ class AppSettings(context: Context) {
         get() = preferences.getLong(KEY_LAST_REMINDER_AT, 0L)
         set(value) = preferences.edit().putLong(KEY_LAST_REMINDER_AT, value).apply()
 
+    var customAudioEnabled: Boolean
+        get() = preferences.getBoolean(KEY_CUSTOM_AUDIO_ENABLED, false)
+        set(value) = preferences.edit().putBoolean(KEY_CUSTOM_AUDIO_ENABLED, value).apply()
+
     var curfewEnabled: Boolean
         get() = preferences.getBoolean(KEY_CURFEW_ENABLED, false)
         set(value) = preferences.edit().putBoolean(KEY_CURFEW_ENABLED, value).apply()
@@ -62,6 +66,7 @@ class AppSettings(context: Context) {
         private const val KEY_VOICE_ENABLED = "voice_enabled"
         private const val KEY_REMINDER_TEXT = "reminder_text"
         private const val KEY_LAST_REMINDER_AT = "last_reminder_at"
+        private const val KEY_CUSTOM_AUDIO_ENABLED = "custom_audio_enabled"
         private const val KEY_CURFEW_ENABLED = "curfew_enabled"
         private const val KEY_CURFEW_START_HOUR = "curfew_start_hour"
         private const val KEY_CURFEW_END_HOUR = "curfew_end_hour"
