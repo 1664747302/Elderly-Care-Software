@@ -13,7 +13,10 @@ import android.view.accessibility.AccessibilityEvent
 class ElderAccessibilityService : AccessibilityService() {
 
     private var currentApp: String? = null
-    private var appStartTime: Long = 0L
+    
+    // We maintain a list of past usage transition events to pass to raw analyzer
+    private val rawEvents = mutableListOf<UsageSessionEvent>()
+    
     private val handler = Handler(Looper.getMainLooper())
     private var checkRunnable: Runnable? = null
 
@@ -24,7 +27,7 @@ class ElderAccessibilityService : AccessibilityService() {
             if (intent?.action == Intent.ACTION_SCREEN_OFF) {
                 stopTimer()
                 currentApp = null
-                appStartTime = 0L
+                rawEvents.clear()
             }
         }
     }
@@ -66,20 +69,30 @@ class ElderAccessibilityService : AccessibilityService() {
     private fun handleAppChange(newPkg: String) {
         if (currentApp == newPkg) return
 
+        val now = System.currentTimeMillis()
         val isLauncherOrSelf = launcherPackages.contains(newPkg)
         val wasLauncherOrSelf = launcherPackages.contains(currentApp ?: "")
 
+        // Record the event
+        if (currentApp != null) {
+            rawEvents.add(UsageSessionEvent(now, currentApp!!, UsageSessionEvent.Type.ACTIVITY_PAUSED))
+        }
+        rawEvents.add(UsageSessionEvent(now, newPkg, UsageSessionEvent.Type.ACTIVITY_RESUMED))
+        currentApp = newPkg
+
+        // Clean up history to keep memory footprint bounded (keep only last 100 events)
+        if (rawEvents.size > 100) {
+            val keep = rawEvents.takeLast(50)
+            rawEvents.clear()
+            rawEvents.addAll(keep)
+        }
+
         if (isLauncherOrSelf) {
             stopTimer()
-            currentApp = newPkg
-            appStartTime = 0L
         } else {
-            if (wasLauncherOrSelf || currentApp == null) {
-                currentApp = newPkg
-                appStartTime = System.currentTimeMillis()
+            if (wasLauncherOrSelf) {
                 startTimer()
             } else {
-                currentApp = newPkg
                 // Check usage limit immediately when switching app (so we don't wait for timer tick)
                 checkUsageLimit()
             }
@@ -105,17 +118,25 @@ class ElderAccessibilityService : AccessibilityService() {
 
     private fun checkUsageLimit() {
         val now = System.currentTimeMillis()
-        if (appStartTime <= 0L || currentApp == null) return
+        if (currentApp == null || launcherPackages.contains(currentApp!!)) return
 
-        val durationMillis = now - appStartTime
         val settings = AppSettings(applicationContext)
         val isCurfew = settings.isCurfewActive(now)
-        val thresholdMinutes = if (isCurfew) 2 else settings.reminderMinutes
+        val thresholdMinutes = if (isCurfew) settings.curfewReminderIntervalMinutes else settings.reminderMinutes
+        val restGraceMinutes = settings.restGracePeriodMinutes
 
-        if (durationMillis >= thresholdMinutes * 60_000L) {
+        // Analyze using the updated robust analyzer that implements restGracePeriod minutes!
+        val analyzer = UsageSessionAnalyzer(packageName)
+        val session = analyzer.currentSession(rawEvents, now, ignoredPackages = launcherPackages, restGracePeriodMinutes = restGraceMinutes)
+
+        if (session.packageName == null || session.durationMillis <= 0L) {
+            return
+        }
+
+        if (session.exceeds(thresholdMinutes)) {
             val cooldownMillis = if (isCurfew) {
-                2 * 60_000L
-            } else if (settings.lastReminderAtMillis >= appStartTime) {
+                settings.curfewReminderIntervalMinutes * 60_000L
+            } else if (settings.lastReminderAtMillis >= session.startTimeMillis) {
                 // already reminded in this session
                 settings.repeatedReminderIntervalMinutes * 60_000L
             } else {
@@ -133,15 +154,32 @@ class ElderAccessibilityService : AccessibilityService() {
     private fun triggerReminder(now: Long, thresholdMinutes: Int, isCurfew: Boolean) {
         val settings = AppSettings(applicationContext)
         val reminderText = if (isCurfew) {
-            "家人，现在已到深夜宵禁时间，您已经连续看手机超过两分钟了。为了您的睡眠和身体，请立即闭眼休息。"
+            "家人，现在已到深夜宵禁时间，您已经连续看手机超过${thresholdMinutes}分钟了。为了您的睡眠和身体，请立即闭眼休息。"
         } else {
             settings.reminderText
         }
 
+        // Show Notification
         ReminderNotifier(applicationContext).show(reminderText)
+        
+        // Show Full Screen Alert Dialog Activity
+        try {
+            val intent = Intent(applicationContext, ReminderDialogActivity::class.java).apply {
+                putExtra("reminder_text", reminderText)
+                putExtra("is_curfew", isCurfew)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            applicationContext.startActivity(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        // SpeechReminder speak will also be triggered inside ReminderDialogActivity, 
+        // fallback in case activity launch fails or doesn't play
         if (settings.voiceEnabled) {
             SpeechReminder.speak(applicationContext, reminderText, isCurfew)
         }
+        
         settings.lastReminderAtMillis = now
 
         try {

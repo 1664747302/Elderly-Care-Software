@@ -3,6 +3,7 @@ package com.example.elderreminder
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.content.Intent
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 
@@ -20,7 +21,7 @@ class UsageReminderWorker(
         val isCurfew = settings.isCurfewActive(now)
 
         // 根据是否为“夜间宵禁”确定提醒阈值和最长查询区间
-        val thresholdMinutes = if (isCurfew) 2 else settings.reminderMinutes
+        val thresholdMinutes = if (isCurfew) settings.curfewReminderIntervalMinutes else settings.reminderMinutes
         val thresholdMillis = thresholdMinutes * 60_000L
 
         // 获取比检测区间更长一段时间的统计，确保能追溯到当前前台运行会话的起始点
@@ -41,7 +42,7 @@ class UsageReminderWorker(
             val alreadyRemindedInSession = settings.lastReminderAtMillis >= session.startTimeMillis
 
             val cooldownMillis = if (isCurfew) {
-                2 * 60_000L
+                settings.curfewReminderIntervalMinutes * 60_000L
             } else if (alreadyRemindedInSession) {
                 // 如果已在该会话提醒过且未停止使用手机，则按照家人设置的重复提醒间隔计算冷却时间
                 settings.repeatedReminderIntervalMinutes * 60_000L
@@ -53,15 +54,32 @@ class UsageReminderWorker(
 
             if (cooldownPassed) {
                 val reminderText = if (isCurfew) {
-                    "家人，现在已到深夜宵禁时间，您已经连续看手机超过两分钟了。为了您的睡眠和身体，请立即闭眼休息。"
+                    "家人，现在已到深夜宵禁时间，您已经连续看手机超过${thresholdMinutes}分钟了。为了您的睡眠和身体，请立即闭眼休息。"
                 } else {
                     settings.reminderText
                 }
 
+                // Show Notification
                 ReminderNotifier(applicationContext).show(reminderText)
+                
+                // Show Full Screen Alert Dialog Activity
+                try {
+                    val intent = Intent(applicationContext, ReminderDialogActivity::class.java).apply {
+                        putExtra("reminder_text", reminderText)
+                        putExtra("is_curfew", isCurfew)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    }
+                    applicationContext.startActivity(intent)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
+                // SpeechReminder speak will also be triggered inside ReminderDialogActivity, 
+                // fallback in case activity launch fails or doesn't play
                 if (settings.voiceEnabled) {
                     SpeechReminder.speak(applicationContext, reminderText, isCurfew)
                 }
+                
                 settings.lastReminderAtMillis = now
 
                 // 写入本地数据库，用于生成习惯周报
@@ -109,8 +127,10 @@ class UsageReminderWorker(
         private const val CURFEW_WORK_NAME = "elder_usage_reminder_curfew"
 
         fun enqueueNextCurfewCheck(context: Context) {
+            val settings = AppSettings(context)
+            val intervalMinutes = settings.curfewReminderIntervalMinutes
             val request = androidx.work.OneTimeWorkRequestBuilder<UsageReminderWorker>()
-                .setInitialDelay(2, java.util.concurrent.TimeUnit.MINUTES)
+                .setInitialDelay(intervalMinutes.toLong(), java.util.concurrent.TimeUnit.MINUTES)
                 .build()
             androidx.work.WorkManager.getInstance(context).enqueueUniqueWork(
                 CURFEW_WORK_NAME,

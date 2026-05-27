@@ -5,3 +5,4 @@ local.properties
 *.iml
 app/build/
 .superpowers/
+elder_reminder_ascii/

@@ -31,7 +31,8 @@ D:\Project\提醒
 ### 1. 架构升级与逻辑重构
 * **添加无障碍服务 `ElderAccessibilityService.kt`**：
   - 精准监听 `AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED` 事件，可以在老人切换应用或返回桌面时，瞬间（秒级）捕获当前交互的前台应用包名。
-  - 内部基于 `Handler` 维护了 10 秒级低功耗检测轮询守护计时器（仅在前台运行非系统桌面及非本应用的普通 App 时启动，极大避免后台过度消耗 CPU 和电池消耗）。
+  - 引入了**防卡bug的休息判定时间间隔算法**：以前老人可以通过快速返回桌面（回到Launcher系统桌面）或瞬间锁屏/亮灭屏来刷新前台应用连续使用计时，从而无限延续手机使用时长卡漏洞。现在，前台监测逻辑在用户返回桌面、锁屏或断开使用时不立刻清除总连续时间，而是维护一个由家人在设置中自定义的短暂休息判定阻尼冷却时长（`restGracePeriodMinutes`，默认 3 分钟）。只有老人真正连续离开非白名单应用、在桌面或处于灭屏状态超过这一休息判定时间阀值，当前的连续使用会话才会被判定为已“彻底断开并完成休息”，使用时间被重置。若在此时间内再次打开手机看微信/刷抖音，应用会自动追溯累加刚才的真实连续使用时长，从而科学无漏洞防沉迷。
+  - 基于 `Handler` 维护了 10 秒级低功耗检测轮询守护计时器（仅在前台运行非系统桌面及非本应用的普通 App 时启动，极大避免后台过度消耗 CPU 和电池消耗）。
   - 支持对亮/灭屏状态的动态监听。注册 `Intent.ACTION_SCREEN_OFF` 广播接收器，当屏幕熄灭或锁屏时自动暂停/清空前台应用计时计数。
   - 自动通过 `packageManager.queryIntentActivities` 动态匹配设备上的系统桌面包名，并在会话判定中智能过滤掉系统桌面和本应用自身，确保不产生误判。
   - 冷却时间机制与原 `UsageReminderWorker.kt` 逻辑深度对齐：区分普通（以常规或在此会话已提醒过的 `repeatedReminderIntervalMinutes` 为准）与夜间宵禁限值（以 2 分钟为限值及冷却阈值）。
@@ -53,6 +54,19 @@ D:\Project\提醒
 * 新增无障碍配置 `res/values/strings.xml` 中关于开启该服务时的描述性文本引导 (`accessibility_desc`)。
 * 源码已在 `D:\Project\Elderly Care Software` 编译完毕。
 * 使用 `robocopy` 镜像并分发代码副本至 `D:\elder_reminder_ascii` 目录下，该处的 JUnit 单元测试已全部通过！
+
+## 弹窗与最大音量强制语音提醒功能升级 (2026-05-27)
+
+为彻底解决老人在后台使用其他应用时无法直观感知或听清系统提醒通知的问题，我们为应用引入了“最大提醒语音自主播放 + 弹窗通知文字提示”的双重强交互提醒机制：
+1. **强行拉起全屏 Activity 弹窗 (`ReminderDialogActivity.kt`)**：
+   - 当检测触及时，无论前台在运行什么第三方应用（或锁屏、屏幕亮灭交替），系统自动瞬间拉起专为老人设计的 `ReminderDialogActivity`。
+   - 弹窗采用高宽屏高对比度大字体设计（深夜宵禁时背景为暗色月亮护眼指引，常规提醒为绿色眼睛指引），并提供显著的“我知道了，闭眼休息”一键点击关闭按钮，直接切断老人的沉迷习惯。
+2. **强制最大音量播放系统/录音语音**：
+   - 在弹窗初始化时，通过调用系统的 `AudioManager` 强制获取当前媒体声道的最大可用音量 (`STREAM_MUSIC`)，并将当前音量自动设置为最大级别，即使老人误触静音或将手机设置为了低音量，也能被突然拉起的最响亮声音惊醒并注意休息。
+3. **多重降级兜底保障**：
+   - 对 `AndroidManifest.xml` 新增了 `android.permission.USE_FULL_SCREEN_INTENT` 高优先级强拉屏幕提醒权限，并在 Service/Worker 侧同时实现了拉起全屏 Intent + 后台播放的双重触发结构，确证在 Activity 调度异常时仍有后台通知与 TTS 播放防线。
+4. **构建与测试**：
+   - 包含 `ReminderDialogActivity` 的 APK 在 `D:\Project\Elderly Care Software` 干净编译生成，且 `D:\elder_reminder_ascii` 本地回归测试全部通过。
 
 ## 重复提醒功能更新 (2026-05-25)
 
@@ -331,6 +345,7 @@ cd D:\elder_reminder_ascii
 - `curfewEnabled`：默认 `false`。
 - `curfewStartHour`：默认 `22`。
 - `curfewEndHour`：默认 `6`。
+- `curfewReminderIntervalMinutes`：默认 `2`，写入时限制在 `1..15` 分钟。
 
 还包含 `isCurfewActive(nowMillis)`，支持普通时间段和跨午夜时间段，例如 22:00 到 06:00。
 
@@ -341,14 +356,14 @@ cd D:\elder_reminder_ascii
 - 没有使用情况权限时直接成功退出。
 - 读取当前设置和宵禁状态。
 - 普通模式使用 `settings.reminderMinutes` 作为阈值。
-- 宵禁模式使用 2 分钟作为阈值。
-- 普通模式冷却时间等于提醒间隔；宵禁模式冷却时间为 2 分钟。
+- 宵禁模式使用可配置的 `curfewReminderIntervalMinutes` （默认 2 分钟）作为阈值。
+- 普通模式冷却时间等于提醒间隔；宵禁模式冷却时间由家人设置的 `curfewReminderIntervalMinutes` 决定（默认 2 分钟）。
 - 查询 `now - 阈值 - 15分钟` 到 `now` 的 UsageEvents。
 - 调用 `UsageSessionAnalyzer` 判断当前连续使用时长。
 - 超时后发送通知、语音或录音提醒。
 - 更新 `lastReminderAtMillis`。
 - 写入 SQLite 提醒历史。
-- 宵禁生效时，额外安排 2 分钟后的单次检查任务 `elder_usage_reminder_curfew`。
+- 宵禁生效时，自动安排 `curfewReminderIntervalMinutes` 分钟后的下一次单次高频检测。
 
 ### `UsageSessionAnalyzer.kt`
 

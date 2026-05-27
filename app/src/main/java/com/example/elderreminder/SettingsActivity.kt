@@ -26,10 +26,12 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var settings: AppSettings
     private lateinit var reminderMinutesInput: EditText
     private lateinit var repeatedReminderIntervalInput: EditText
+    private lateinit var restGracePeriodInput: EditText
     private lateinit var reminderTextInput: EditText
     private lateinit var pinInput: EditText
     private lateinit var voiceCheckbox: CheckBox
     private lateinit var curfewCheckbox: CheckBox
+    private lateinit var curfewReminderIntervalInput: EditText
     private lateinit var curfewStartInput: EditText
     private lateinit var curfewEndInput: EditText
     private lateinit var deepseekApiKeyInput: EditText
@@ -113,6 +115,10 @@ class SettingsActivity : AppCompatActivity() {
         root.addView(label("重复提醒间隔（若超时后未停止使用，每隔几分钟提醒一次）"))
         repeatedReminderIntervalInput = editText(settings.repeatedReminderIntervalMinutes.toString(), InputType.TYPE_CLASS_NUMBER)
         root.addView(repeatedReminderIntervalInput)
+
+        root.addView(label("防卡bug的休息判定间隔时间（分钟，1 到 30，在此时间内返回桌面或锁屏不重置使用时间）"))
+        restGracePeriodInput = editText(settings.restGracePeriodMinutes.toString(), InputType.TYPE_CLASS_NUMBER)
+        root.addView(restGracePeriodInput)
 
         root.addView(label("语音提醒"))
         voiceCheckbox = CheckBox(this).apply {
@@ -240,6 +246,10 @@ class SettingsActivity : AppCompatActivity() {
         }
         root.addView(curfewCheckbox)
 
+        root.addView(label("宵禁提醒间隔（分钟，1 到 15）"))
+        curfewReminderIntervalInput = editText(settings.curfewReminderIntervalMinutes.toString(), InputType.TYPE_CLASS_NUMBER)
+        root.addView(curfewReminderIntervalInput)
+
         root.addView(label("宵禁起始时间 (24小时制小时阶，例如 22)"))
         curfewStartInput = editText(settings.curfewStartHour.toString(), InputType.TYPE_CLASS_NUMBER)
         root.addView(curfewStartInput)
@@ -284,12 +294,16 @@ class SettingsActivity : AppCompatActivity() {
     private fun saveSettings() {
         val minutes = reminderMinutesInput.text.toString().toIntOrNull() ?: AppSettings.DEFAULT_REMINDER_MINUTES
         val repeatedInterval = repeatedReminderIntervalInput.text.toString().toIntOrNull() ?: AppSettings.DEFAULT_REPEATED_REMINDER_INTERVAL_MINUTES
+        val restGrace = restGracePeriodInput.text.toString().toIntOrNull() ?: AppSettings.DEFAULT_REST_GRACE_PERIOD_MINUTES
+        val curfewMinutes = curfewReminderIntervalInput.text.toString().toIntOrNull() ?: AppSettings.DEFAULT_CURFEW_REMINDER_INTERVAL_MINUTES
         val pin = pinInput.text.toString().ifBlank { AppSettings.DEFAULT_PIN }
         val startHour = curfewStartInput.text.toString().toIntOrNull() ?: 22
         val endHour = curfewEndInput.text.toString().toIntOrNull() ?: 6
 
         settings.reminderMinutes = minutes
         settings.repeatedReminderIntervalMinutes = repeatedInterval
+        settings.restGracePeriodMinutes = restGrace
+        settings.curfewReminderIntervalMinutes = curfewMinutes
         settings.voiceEnabled = voiceCheckbox.isChecked
         settings.customAudioEnabled = customAudioCheckbox.isChecked
         settings.curfewEnabled = curfewCheckbox.isChecked

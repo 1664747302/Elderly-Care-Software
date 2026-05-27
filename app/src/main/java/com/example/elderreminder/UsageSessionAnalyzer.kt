@@ -23,37 +23,77 @@ data class UsageSession(
 class UsageSessionAnalyzer(
     private val ownPackageName: String,
 ) {
-    fun currentSession(events: List<UsageSessionEvent>, nowMillis: Long): UsageSession {
+    fun currentSession(
+        events: List<UsageSessionEvent>,
+        nowMillis: Long,
+        ignoredPackages: Set<String> = emptySet(),
+        restGracePeriodMinutes: Int = 3
+    ): UsageSession {
+        var sessionStartTime: Long? = null
+        var lastRestStartTime: Long? = null
         var activePackage: String? = null
-        var activeSince: Long? = null
 
-        events.sortedBy { it.timestampMillis }.forEach { event ->
+        val sortedEvents = events.sortedBy { it.timestampMillis }
+        
+        for (event in sortedEvents) {
+            val isIgnored = event.packageName == ownPackageName || ignoredPackages.contains(event.packageName)
             when (event.type) {
                 UsageSessionEvent.Type.ACTIVITY_RESUMED -> {
-                    activePackage = event.packageName
-                    activeSince = event.timestampMillis
+                    if (isIgnored) {
+                        if (activePackage != null) {
+                            lastRestStartTime = event.timestampMillis
+                            activePackage = null
+                        }
+                    } else {
+                        if (lastRestStartTime != null) {
+                            val restDuration = event.timestampMillis - lastRestStartTime
+                            if (restDuration >= restGracePeriodMinutes * 60_000L) {
+                                sessionStartTime = event.timestampMillis
+                            } else {
+                                if (sessionStartTime != null) {
+                                    sessionStartTime += restDuration
+                                } else {
+                                    sessionStartTime = event.timestampMillis
+                                }
+                            }
+                            lastRestStartTime = null
+                        } else {
+                            if (sessionStartTime == null) {
+                                sessionStartTime = event.timestampMillis
+                            }
+                        }
+                        activePackage = event.packageName
+                    }
                 }
-
                 UsageSessionEvent.Type.ACTIVITY_PAUSED,
                 UsageSessionEvent.Type.ACTIVITY_STOPPED -> {
                     if (activePackage == event.packageName) {
+                        lastRestStartTime = event.timestampMillis
                         activePackage = null
-                        activeSince = null
                     }
                 }
             }
         }
 
-        val packageName = activePackage
-        val start = activeSince
-        if (packageName == null || start == null || packageName == ownPackageName) {
-            return UsageSession(packageName = null, durationMillis = 0L)
+        // If the user is currently resting, we also check if they have successfully rested for the grace period.
+        // Wait, if they are currently resting (activePackage is null), but the rest duration *until now* is less than grace period,
+        // does that mean the session is technically still active?
+        // Note: from the perspective of "currentSessionpackageName", if they are currently resting, the active app is indeed null.
+        // But if they resume a normal app again *after* nowMillis, the next analysis will correctly shift the start time.
+        // What if they are currently resting, and WorkManager runs?
+        // If WorkManager runs and activePackage is null, there is no need to show any reminder right now anyway,
+        // because the user is on Launcher or screen is off.
+        // So returning null activePackage is totally correct!
+        val currentActive = activePackage
+        val start = sessionStartTime
+        if (currentActive == null || start == null) {
+            return UsageSession(packageName = null, durationMillis = 0L, startTimeMillis = 0L)
         }
 
         return UsageSession(
-            packageName = packageName,
+            packageName = currentActive,
             durationMillis = (nowMillis - start).coerceAtLeast(0L),
-            startTimeMillis = start,
+            startTimeMillis = start
         )
     }
 }

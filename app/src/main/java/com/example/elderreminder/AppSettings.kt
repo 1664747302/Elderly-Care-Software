@@ -35,16 +35,26 @@ class AppSettings(context: Context) {
 
     var curfewStartHour: Int
         get() = preferences.getInt(KEY_CURFEW_START_HOUR, 22)
-        set(value) = preferences.edit().putInt(KEY_CURFEW_START_HOUR, value.coerceIn(0, 23)).apply()
+        set(value) = preferences.edit().putInt(KEY_CURFEW_START_HOUR, (if (value == 24) 0 else value).coerceIn(0, 23)).apply()
 
     var curfewEndHour: Int
         get() = preferences.getInt(KEY_CURFEW_END_HOUR, 6)
-        set(value) = preferences.edit().putInt(KEY_CURFEW_END_HOUR, value.coerceIn(0, 23)).apply()
+        set(value) = preferences.edit().putInt(KEY_CURFEW_END_HOUR, (if (value == 24) 0 else value).coerceIn(0, 23)).apply()
+
+    // 新增：家人设置的老人宵禁时间的提醒间隔（单位：分钟），限制在 1 到 15 分钟
+    var curfewReminderIntervalMinutes: Int
+        get() = preferences.getInt(KEY_CURFEW_REMINDER_INTERVAL_MINUTES, DEFAULT_CURFEW_REMINDER_INTERVAL_MINUTES)
+        set(value) = preferences.edit().putInt(KEY_CURFEW_REMINDER_INTERVAL_MINUTES, value.coerceIn(1, 15)).apply()
 
     // 新增：如果老人连续使用提醒后依旧没有停止使用手机，家人设置的重复弹窗和语音提醒间隔（单位：分钟）
     var repeatedReminderIntervalMinutes: Int
         get() = preferences.getInt(KEY_REPEATED_REMINDER_INTERVAL_MINUTES, DEFAULT_REPEATED_REMINDER_INTERVAL_MINUTES)
         set(value) = preferences.edit().putInt(KEY_REPEATED_REMINDER_INTERVAL_MINUTES, value.coerceAtLeast(1)).apply()
+
+    // 新增：防卡bug的休息判定间隔时间阈值（单位：分钟），限制在 1 到 30 分钟
+    var restGracePeriodMinutes: Int
+        get() = preferences.getInt(KEY_REST_GRACE_PERIOD_MINUTES, DEFAULT_REST_GRACE_PERIOD_MINUTES)
+        set(value) = preferences.edit().putInt(KEY_REST_GRACE_PERIOD_MINUTES, value.coerceIn(1, 30)).apply()
 
     // 新增：DeepSeek API 评价相关设置
     var deepseekApiKey: String
@@ -83,6 +93,8 @@ class AppSettings(context: Context) {
         const val DEFAULT_REMINDER_MINUTES = 30
         const val DEFAULT_REMINDER_TEXT = "家人，该休息一下了。请放下手机，看看远处，喝点水，活动活动身体。"
         const val DEFAULT_REPEATED_REMINDER_INTERVAL_MINUTES = 5
+        const val DEFAULT_CURFEW_REMINDER_INTERVAL_MINUTES = 2
+        const val DEFAULT_REST_GRACE_PERIOD_MINUTES = 3
 
         private const val KEY_PIN = "pin"
         private const val KEY_REMINDER_MINUTES = "reminder_minutes"
@@ -93,7 +105,9 @@ class AppSettings(context: Context) {
         private const val KEY_CURFEW_ENABLED = "curfew_enabled"
         private const val KEY_CURFEW_START_HOUR = "curfew_start_hour"
         private const val KEY_CURFEW_END_HOUR = "curfew_end_hour"
+        private const val KEY_CURFEW_REMINDER_INTERVAL_MINUTES = "curfew_reminder_interval_minutes"
         private const val KEY_REPEATED_REMINDER_INTERVAL_MINUTES = "repeated_reminder_interval_minutes"
+        private const val KEY_REST_GRACE_PERIOD_MINUTES = "rest_grace_period_minutes"
         private const val KEY_DEEPSEEK_API_KEY = "deepseek_api_key"
         private const val KEY_DEEPSEEK_API_URL = "deepseek_api_url"
         private const val KEY_LAST_AI_EVALUATION_TIME = "last_ai_evaluation_time"
