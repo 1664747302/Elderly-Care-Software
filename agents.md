@@ -99,6 +99,20 @@ cd D:\elder_reminder_ascii
 - IntelliJ 可能自动发现无效 JDK：`C:\Users\26896\.jdks\openjdk-19.0.2`，目前不影响 Gradle 构建。
 - `SettingsActivity.kt` 里的 `MediaRecorder()` 构造函数已 deprecated，后续可按 Android 版本做兼容清理。
 
+## 顶部导航与首页返回升级 (2026-05-27)
+
+为提升多级页面的交互统一性，我们为应用中除 `MainActivity` 外的所有二级/三级页面新增了规范的顶部导航设计，支持快捷返回上一级与一键重定向至主页：
+1. **统一化布局设计**：
+   - 移除原来的单行标题或右侧悬浮“返回”设计，替换为三段式 `LinearLayout` 容器行。
+   - 左侧为“返回”按钮（点击通过 `finish()` 返回上一级）。
+   - 中间为当前页面的正规加粗标题字样（居中对齐）。
+   - 右侧为全新的“首页”导航按钮（点击通过 `Intent.FLAG_ACTIVITY_CLEAR_TOP` 快速回到 `MainActivity`，并出栈历史任务，实现平滑瞬移）。
+2. **涉及页面对象**：
+   - `BloodPressureActivity.kt` (血压自测)
+   - `EyeCareActivity.kt` (护眼项目)
+   - `SettingsActivity.kt` (家人设置)
+   - `ReportActivity.kt` (本地视力与习惯周报)
+
 ## 技术栈
 
 - Android Gradle Plugin：`8.7.3`
