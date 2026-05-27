@@ -6,7 +6,7 @@
 
 - 项目类型：原生 Android 应用，Gradle + Kotlin，单模块 `:app`。
 - 包名：`com.example.elderreminder`。
-- 应用名：`护眼休息提醒`。
+- 应用名：`老人关怀`。
 - 核心目标：给老人使用的本地护眼休息提醒 APK。用户授权 Android“使用情况访问权限”后，应用定期检查当前前台应用连续使用时长，超时后通过系统通知、TTS 或家人录音提醒休息。
 - 隐私模型：设置、录音、提醒历史都只保存在本机；当前代码没有上传服务器的逻辑。
 
@@ -358,7 +358,7 @@ cd D:\elder_reminder_ascii
 
 ## 资源与 UI 风格
 
-- `res/values/strings.xml`：应用名 `护眼休息提醒`。
+- `res/values/strings.xml`：应用名 `老人关怀`。
 - `res/values/colors.xml`：
   - `brand_green`：`#1F6B45`
   - `brand_green_dark`：`#12432B`
