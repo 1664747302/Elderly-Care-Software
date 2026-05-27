@@ -3,6 +3,7 @@ package com.example.elderreminder
 import android.app.DatePickerDialog
 import android.content.Context
 import android.content.DialogInterface
+import android.content.Intent
 import android.graphics.Typeface
 import android.os.Bundle
 import android.text.InputType
@@ -62,21 +63,38 @@ class BloodPressureActivity : AppCompatActivity() {
             setPadding(0, 0, 0, dp(14))
         }
 
-        titleRow.addView(TextView(this).apply {
+        val leftBtn = Button(this).apply {
+            text = "返回"
+            textSize = 18f
+            setTextColor(ContextCompat.getColor(this@BloodPressureActivity, R.color.brand_green_dark))
+            setBackgroundColor(0x00000000)
+            setOnClickListener { finish() }
+        }
+        titleRow.addView(leftBtn, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+
+        val centerTitle = TextView(this).apply {
             text = "血压自测"
-            textSize = 28f
+            textSize = 24f
             setTextColor(ContextCompat.getColor(this@BloodPressureActivity, R.color.brand_green_dark))
             typeface = Typeface.DEFAULT_BOLD
-        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            gravity = Gravity.CENTER
+        }
+        titleRow.addView(centerTitle, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
 
-        // Return Button
-        titleRow.addView(Button(this).apply {
-            text = "返回"
-            textSize = 16f
+        val rightBtn = Button(this).apply {
+            text = "首页"
+            textSize = 18f
             setTextColor(ContextCompat.getColor(this@BloodPressureActivity, R.color.brand_green_dark))
-            setBackgroundColor(0x00000000) // Transparent
-            setOnClickListener { finish() }
-        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+            setBackgroundColor(0x00000000)
+            setOnClickListener {
+                val intent = Intent(this@BloodPressureActivity, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                startActivity(intent)
+                finish()
+            }
+        }
+        titleRow.addView(rightBtn, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
 
         root.addView(titleRow)
 

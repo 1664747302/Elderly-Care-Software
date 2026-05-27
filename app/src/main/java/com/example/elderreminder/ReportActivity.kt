@@ -1,11 +1,13 @@
 package com.example.elderreminder
 
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -42,14 +44,47 @@ class ReportActivity : AppCompatActivity() {
             setBackgroundColor(ContextCompat.getColor(this@ReportActivity, R.color.warm_background))
         }
 
-        // 标题
-        root.addView(TextView(this).apply {
+        // Title Row
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(18))
+        }
+
+        val leftBtn = Button(this).apply {
+            text = "返回"
+            textSize = 18f
+            setTextColor(ContextCompat.getColor(this@ReportActivity, R.color.brand_green_dark))
+            setBackgroundColor(0x00000000)
+            setOnClickListener { finish() }
+        }
+        titleRow.addView(leftBtn, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+
+        val centerTitle = TextView(this).apply {
             text = "本地视力与习惯周报"
-            textSize = 28f
+            textSize = 22f
             setTextColor(ContextCompat.getColor(this@ReportActivity, R.color.brand_green_dark))
             typeface = Typeface.DEFAULT_BOLD
-            setPadding(0, 0, 0, dp(8))
-        })
+            gravity = Gravity.CENTER
+        }
+        titleRow.addView(centerTitle, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+
+        val rightBtn = Button(this).apply {
+            text = "首页"
+            textSize = 18f
+            setTextColor(ContextCompat.getColor(this@ReportActivity, R.color.brand_green_dark))
+            setBackgroundColor(0x00000000)
+            setOnClickListener {
+                val intent = Intent(this@ReportActivity, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                startActivity(intent)
+                finish()
+            }
+        }
+        titleRow.addView(rightBtn, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+
+        root.addView(titleRow)
 
         root.addView(TextView(this).apply {
             text = "此报告完全生成并在本地保存，绝不上传至任何服务器，保障家人隐私。"

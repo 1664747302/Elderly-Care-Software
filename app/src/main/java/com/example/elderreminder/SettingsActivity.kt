@@ -19,6 +19,8 @@ import androidx.core.app.ActivityCompat
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import android.view.Gravity
+import android.graphics.Typeface
 
 class SettingsActivity : AppCompatActivity() {
     private lateinit var settings: AppSettings
@@ -63,7 +65,47 @@ class SettingsActivity : AppCompatActivity() {
             setBackgroundColor(ContextCompat.getColor(this@SettingsActivity, R.color.warm_background))
         }
 
-        root.addView(title("家人设置"))
+        // Title Row
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(20))
+        }
+
+        val leftBtn = Button(this).apply {
+            text = "返回"
+            textSize = 18f
+            setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.brand_green_dark))
+            setBackgroundColor(0x00000000)
+            setOnClickListener { finish() }
+        }
+        titleRow.addView(leftBtn, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+
+        val centerTitle = TextView(this).apply {
+            text = "家人设置"
+            textSize = 24f
+            setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.brand_green_dark))
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+        }
+        titleRow.addView(centerTitle, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+
+        val rightBtn = Button(this).apply {
+            text = "首页"
+            textSize = 18f
+            setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.brand_green_dark))
+            setBackgroundColor(0x00000000)
+            setOnClickListener {
+                val intent = Intent(this@SettingsActivity, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                startActivity(intent)
+                finish()
+            }
+        }
+        titleRow.addView(rightBtn, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+
+        root.addView(titleRow)
         root.addView(label("提醒间隔（分钟，15 到 180）"))
         reminderMinutesInput = editText(settings.reminderMinutes.toString(), InputType.TYPE_CLASS_NUMBER)
         root.addView(reminderMinutesInput)
