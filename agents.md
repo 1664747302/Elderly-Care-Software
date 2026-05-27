@@ -114,6 +114,7 @@ cd D:\elder_reminder_ascii
         │   │   ├── AppSettings.kt
         │   │   ├── BootCompletedReceiver.kt
         │   │   ├── BloodPressureActivity.kt
+        │   │   ├── BloodPressureDbHelper.kt
         │   │   ├── EyeCareActivity.kt
         │   │   ├── MainActivity.kt
         │   │   ├── ReminderHistoryDbHelper.kt
@@ -129,6 +130,7 @@ cd D:\elder_reminder_ascii
         │       ├── drawable/         # 启动图标、主按钮、状态面板 drawable。
         │       └── values/           # strings、colors、AppCompat 无 ActionBar 主题。
         └── test/kotlin/com/example/elderreminder/
+            ├── BloodPressureTest.kt
             ├── CurfewTimeCalculatorTest.kt
             ├── CustomAudioFallbackTest.kt
             ├── ReminderHistoryDbHelperTest.kt
@@ -209,7 +211,18 @@ cd D:\elder_reminder_ascii
 
 ### `BloodPressureActivity.kt`
 
-血压自测二级页面备份（当前做 UI 占位），显示“功能开发中”。
+血压自测二级页面，负责：
+- 顶端显示选择的日期（支持前一天/后一天切换，点击日期可通过 DatePickerDialog 直观挑选任何一天）。
+- 面板式展示“早晨、中午、晚上”三个时段的自测状态。
+- 未录入时提供醒目的“填写测量数据”按钮；已录入时居中并大字号展现“高压/低压/心率”的数值，并附带针对血压状态（正常、正常偏高、偏高、偏低）的个性化医学指导建议与指示色卡。
+- 提供对已录入数值的“修改数据”以及“重新录入”选项。
+- 采用输入弹窗（AlertDialog + 三项数值校验），限制高压/低压/心率在正常生理极值内，并限制收缩压不能低于舒张压，防止老人误触输入错乱。
+- 下方卡片式排列展示最近 15 次测量的历史列表，一目了然。
+
+### `BloodPressureDbHelper.kt`
+
+本地 SQLite 血压自测数据存储。数据库 `elder_blood_pressure.db`。表 `blood_pressures`。字段包括：日期 (YYYY-MM-DD)、时段 (早晨/中午/晚上)、高压、低压、心率、录入时间戳。支持根据日期+时段单条覆盖/去重写入、根据日期查询全天记录，以及获取按降序排列的最近测量历史。
+
 
 ### `SettingsActivity.kt`
 
