@@ -36,9 +36,14 @@ class BloodPressureActivity : AppCompatActivity() {
     private lateinit var cardsContainer: LinearLayout
     private lateinit var historyContainer: LinearLayout
 
+    private lateinit var settings: AppSettings
+    private lateinit var aiButton: Button
+    private lateinit var aiResultView: TextView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         dbHelper = BloodPressureDbHelper(this)
+        settings = AppSettings(this)
         setContentView(buildContent())
         refreshData()
     }
@@ -120,6 +125,67 @@ class BloodPressureActivity : AppCompatActivity() {
         dateBand.addView(nextBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
 
         root.addView(dateBand, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(18) })
+
+        // 智能血压健康评估卡片
+        val aiCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = ContextCompat.getDrawable(this@BloodPressureActivity, R.drawable.status_panel)
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+
+        val aiTitleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        aiTitleRow.addView(TextView(this).apply {
+            text = "🤖 30天血压趋势智能评估"
+            textSize = 20f
+            setTextColor(ContextCompat.getColor(this@BloodPressureActivity, R.color.brand_green_dark))
+            typeface = Typeface.DEFAULT_BOLD
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        
+        aiCard.addView(aiTitleRow)
+
+        aiCard.addView(View(this).apply {
+            setBackgroundColor(0xFFEEEEEE.toInt())
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(1)
+        ).apply {
+            topMargin = dp(8)
+            bottomMargin = dp(10)
+        })
+
+        aiResultView = TextView(this).apply {
+            text = if (settings.lastAiEvaluationResult.isNotBlank()) {
+                val timeStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(settings.lastAiEvaluationTimeMillis))
+                "【上次评估时间：$timeStr】\n\n${settings.lastAiEvaluationResult}"
+            } else {
+                "点击下方按钮，开始使用 AI 智能分析评估近30天的血压/心率趋势（需要至少7天有自测数据并且在家人设置中配置了有效的 DeepSeek API 密钥）。"
+            }
+            textSize = 15f
+            setTextColor(0xFF333333.toInt())
+        }
+        aiCard.addView(aiResultView)
+
+        aiButton = Button(this).apply {
+            text = "获取 AI 健康评价"
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            background = ContextCompat.getDrawable(this@BloodPressureActivity, R.drawable.button_primary)
+            setOnClickListener {
+                runAiEvaluation(aiButton, aiResultView)
+            }
+        }
+        aiCard.addView(aiButton, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(14) })
+
+        root.addView(aiCard, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { bottomMargin = dp(18) })
@@ -584,6 +650,145 @@ class BloodPressureActivity : AppCompatActivity() {
             systolic in 120..139 || diastolic in 80..89 -> BPStatus.PRE_HIGH
             else -> BPStatus.NORMAL
         }
+    }
+
+    private fun getRecent30DaysDataForAI(dbHelper: BloodPressureDbHelper): String {
+        val records = dbHelper.getRecentRecords(limit = 90)
+        if (records.isEmpty()) return "无数据"
+
+        val sb = java.lang.StringBuilder()
+        val grouped = records.groupBy { it.date }.toSortedMap()
+
+        grouped.forEach { (date, dayRecords) ->
+            val recordStrings = dayRecords.map { rec ->
+                "${rec.period}:${rec.systolic}/${rec.diastolic}mmHg(心率:${rec.heartRate})"
+            }
+            sb.append("$date [${recordStrings.joinToString(", ")}]\n")
+        }
+        return sb.toString()
+    }
+
+    private fun runAiEvaluation(button: Button, resultText: TextView) {
+        val apiKey = settings.deepseekApiKey
+        if (apiKey.isBlank()) {
+            Toast.makeText(this, "请让家人先在‘家人设置’中配置有效的 DeepSeek API 密钥和接口地址", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val records = dbHelper.getRecentRecords(limit = 90)
+        val grouped = records.groupBy { it.date }
+        if (grouped.size < 7) {
+            Toast.makeText(this, "目前数据量不足（建议至少记录 7 天以上），AI 无法准确分析趋势，请继续坚持记录", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        val lastTime = settings.lastAiEvaluationTimeMillis
+        val isCooldowned = (now - lastTime) >= 24 * 60 * 60 * 1000L
+        if (!isCooldowned && settings.lastAiEvaluationResult.isNotBlank()) {
+            Toast.makeText(this, "今天已经分析评估过了，每天仅限科学评估一次，请明天再试", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        button.isEnabled = false
+        button.text = "正在咨询 AI 医生，请稍候..."
+        resultText.text = "正在整理您的血压历史，并生成深度趋势分析，大概需要十多秒，请不要退出页面..."
+
+        val dataStr = getRecent30DaysDataForAI(dbHelper)
+
+        val thread = Thread {
+            try {
+                var baseUrl = settings.deepseekApiUrl
+                if (!baseUrl.endsWith("/")) {
+                    baseUrl += "/"
+                }
+                val urlConnection = java.net.URL(baseUrl + "chat/completions").openConnection() as java.net.HttpURLConnection
+                urlConnection.requestMethod = "POST"
+                urlConnection.connectTimeout = 30000
+                urlConnection.readTimeout = 30000
+                urlConnection.doOutput = true
+                urlConnection.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                urlConnection.setRequestProperty("Authorization", "Bearer $apiKey")
+
+                val systemPrompt = "你是一位资深的心血管医生。请阅读用户近 30 天的血压和心率变化数据，并按以下严格的格式输出近期健康评分与建议。不要多余的寒暄，直接输出以下结构：\\n\\n### 📊 近期综合健康评分：[请评估一个0-100的分数，并说明主因]\\n\\n### 📈 数值趋势特征：\\n- [如：清晨血压偏高/波动较大/心率平稳等]\\n\\n### 🍎 针对性作息与饮食建议：\\n1. [建议1]\\n2. [建议2]\\n\\n免责声明：此评估基于历史数据生成，仅供参考，不作为确诊与药物治疗依据。"
+                val safeUserContent = dataStr.replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\n", "\\n")
+                    .replace("\r", "")
+
+                val jsonBody = "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"system\",\"content\":\"$systemPrompt\"},{\"role\":\"user\",\"content\":\"近30天测得的血压数据如下：\\n$safeUserContent\"}],\"temperature\":0.3}"
+
+                urlConnection.outputStream.use { os ->
+                    val bytes = jsonBody.toByteArray(Charsets.UTF_8)
+                    os.write(bytes, 0, bytes.size)
+                }
+
+                val responseCode = urlConnection.responseCode
+                if (responseCode == 200) {
+                    val responseText = urlConnection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                    
+                    // Simple parse content from JSON to avoid large dependency
+                    val contentKey = "\"content\":\""
+                    val contentStartIdx = responseText.indexOf(contentKey)
+                    if (contentStartIdx != -1) {
+                        val start = contentStartIdx + contentKey.length
+                        var end = start
+                        val resultSb = java.lang.StringBuilder()
+                        var escaped = false
+                        while (end < responseText.length) {
+                            val char = responseText[end]
+                            if (escaped) {
+                                when (char) {
+                                    'n' -> resultSb.append('\n')
+                                    't' -> resultSb.append('\t')
+                                    'r' -> resultSb.append('\r')
+                                    '\\' -> resultSb.append('\\')
+                                    '"' -> resultSb.append('"')
+                                    else -> resultSb.append(char)
+                                }
+                                escaped = false
+                            } else if (char == '\\') {
+                                escaped = true
+                            } else if (char == '"') {
+                                break
+                            } else {
+                                resultSb.append(char)
+                            }
+                            end++
+                        }
+
+                        val parsedResult = resultSb.toString().trim()
+                        if (parsedResult.isNotBlank()) {
+                            runOnUiThread {
+                                settings.lastAiEvaluationResult = parsedResult
+                                settings.lastAiEvaluationTimeMillis = System.currentTimeMillis()
+                                val timeStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(settings.lastAiEvaluationTimeMillis))
+                                resultText.text = "【评估时间：$timeStr】\n\n$parsedResult"
+                                button.isEnabled = true
+                                button.text = "获取 AI 健康评价"
+                                Toast.makeText(this@BloodPressureActivity, "智能评估生成成功！", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            throw Exception("AI 未返回有效内容")
+                        }
+                    } else {
+                        throw Exception("JSON 响应结构异常")
+                    }
+                } else {
+                    val errorStream = urlConnection.errorStream
+                    val errorText = errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
+                    throw Exception("HTTP $responseCode: $errorText")
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    button.isEnabled = true
+                    button.text = "重新获取 AI 健康评价"
+                    resultText.text = "【评估失败】\n\n原因：${e.message}\n\n建议：请检查是否连接了网络，或者在“家人设置”中仔细校验 DeepSeek API 密钥和接口路由是否配置无误。"
+                    Toast.makeText(this@BloodPressureActivity, "评估分析失败：${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+        thread.start()
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

@@ -46,6 +46,23 @@ class AppSettings(context: Context) {
         get() = preferences.getInt(KEY_REPEATED_REMINDER_INTERVAL_MINUTES, DEFAULT_REPEATED_REMINDER_INTERVAL_MINUTES)
         set(value) = preferences.edit().putInt(KEY_REPEATED_REMINDER_INTERVAL_MINUTES, value.coerceAtLeast(1)).apply()
 
+    // 新增：DeepSeek API 评价相关设置
+    var deepseekApiKey: String
+        get() = preferences.getString(KEY_DEEPSEEK_API_KEY, "") ?: ""
+        set(value) = preferences.edit().putString(KEY_DEEPSEEK_API_KEY, value.trim()).apply()
+
+    var deepseekApiUrl: String
+        get() = preferences.getString(KEY_DEEPSEEK_API_URL, "https://api.deepseek.com/v1") ?: "https://api.deepseek.com/v1"
+        set(value) = preferences.edit().putString(KEY_DEEPSEEK_API_URL, value.trim()).apply()
+
+    var lastAiEvaluationTimeMillis: Long
+        get() = preferences.getLong(KEY_LAST_AI_EVALUATION_TIME, 0L)
+        set(value) = preferences.edit().putLong(KEY_LAST_AI_EVALUATION_TIME, value).apply()
+
+    var lastAiEvaluationResult: String
+        get() = preferences.getString(KEY_LAST_AI_EVALUATION_RESULT, "") ?: ""
+        set(value) = preferences.edit().putString(KEY_LAST_AI_EVALUATION_RESULT, value).apply()
+
     fun isCurfewActive(nowMillis: Long): Boolean {
         if (!curfewEnabled) return false
         val cal = java.util.Calendar.getInstance().apply { timeInMillis = nowMillis }
@@ -77,5 +94,9 @@ class AppSettings(context: Context) {
         private const val KEY_CURFEW_START_HOUR = "curfew_start_hour"
         private const val KEY_CURFEW_END_HOUR = "curfew_end_hour"
         private const val KEY_REPEATED_REMINDER_INTERVAL_MINUTES = "repeated_reminder_interval_minutes"
+        private const val KEY_DEEPSEEK_API_KEY = "deepseek_api_key"
+        private const val KEY_DEEPSEEK_API_URL = "deepseek_api_url"
+        private const val KEY_LAST_AI_EVALUATION_TIME = "last_ai_evaluation_time"
+        private const val KEY_LAST_AI_EVALUATION_RESULT = "last_ai_evaluation_result"
     }
 }

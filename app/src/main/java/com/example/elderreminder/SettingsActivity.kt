@@ -30,6 +30,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var curfewCheckbox: CheckBox
     private lateinit var curfewStartInput: EditText
     private lateinit var curfewEndInput: EditText
+    private lateinit var deepseekApiKeyInput: EditText
+    private lateinit var deepseekApiUrlInput: EditText
     
     private lateinit var customAudioCheckbox: CheckBox
     private lateinit var recordRegularButton: Button
@@ -197,6 +199,16 @@ class SettingsActivity : AppCompatActivity() {
         reminderTextInput.minLines = 3
         root.addView(reminderTextInput)
 
+        root.addView(label("DeepSeek API 密钥 (用于生成血压健康分析级评价)"))
+        deepseekApiKeyInput = editText(settings.deepseekApiKey, InputType.TYPE_CLASS_TEXT)
+        deepseekApiKeyInput.hint = "填写以开启血压智能评估（例如：sk-...）"
+        root.addView(deepseekApiKeyInput)
+
+        root.addView(label("DeepSeek API 自定义接口地址 (支持中转域名)"))
+        deepseekApiUrlInput = editText(settings.deepseekApiUrl, InputType.TYPE_CLASS_TEXT)
+        deepseekApiUrlInput.hint = "默认：https://api.deepseek.com/v1"
+        root.addView(deepseekApiUrlInput)
+
         root.addView(label("新的家人 PIN"))
         pinInput = editText(settings.pin, InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD)
         root.addView(pinInput)
@@ -230,6 +242,9 @@ class SettingsActivity : AppCompatActivity() {
         settings.curfewStartHour = startHour
         settings.curfewEndHour = endHour
         settings.reminderText = reminderTextInput.text.toString()
+        settings.deepseekApiKey = deepseekApiKeyInput.text.toString().trim()
+        val apiUrl = deepseekApiUrlInput.text.toString().trim()
+        settings.deepseekApiUrl = if (apiUrl.isBlank()) "https://api.deepseek.com/v1" else apiUrl
         settings.pin = pin
         ReminderScheduler.schedule(this)
 
