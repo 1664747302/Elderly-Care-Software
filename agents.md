@@ -113,6 +113,8 @@ cd D:\elder_reminder_ascii
         │   ├── java/com/example/elderreminder/
         │   │   ├── AppSettings.kt
         │   │   ├── BootCompletedReceiver.kt
+        │   │   ├── BloodPressureActivity.kt
+        │   │   ├── EyeCareActivity.kt
         │   │   ├── MainActivity.kt
         │   │   ├── ReminderHistoryDbHelper.kt
         │   │   ├── ReminderNotifier.kt
@@ -193,11 +195,21 @@ cd D:\elder_reminder_ascii
 
 启动页，UI 全部用 Kotlin 代码构建。负责：
 
+- 展示“护眼项目”和“血压自测”两大核心板块的入口。
+- Android 13+ 动态请求通知权限。
+
+### `EyeCareActivity.kt`
+
+护眼项目二级主页，负责：
+
 - 初始化 `AppSettings`。
-- Android 13+ 请求通知权限。
 - 展示使用情况权限是否开启。
 - 开始后台提醒。
-- 用 PIN 保护 `SettingsActivity` 和 `ReportActivity`。
+- 提供受 PIN 密码验证保护的“家人设置”与“视力与习惯周报”入口。
+
+### `BloodPressureActivity.kt`
+
+血压自测二级页面备份（当前做 UI 占位），显示“功能开发中”。
 
 ### `SettingsActivity.kt`
 
