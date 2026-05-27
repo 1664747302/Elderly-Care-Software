@@ -20,6 +20,12 @@
             android:name=".ReportActivity"
             android:exported="false" />
         <activity
+            android:name=".EyeCareActivity"
+            android:exported="false" />
+        <activity
+            android:name=".BloodPressureActivity"
+            android:exported="false" />
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
