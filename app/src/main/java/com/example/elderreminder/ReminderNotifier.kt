@@ -35,7 +35,7 @@ class ReminderNotifier(private val context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "护眼休息提醒",
+            "老人关怀",
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
             description = "长时间使用手机后的本地休息提醒"

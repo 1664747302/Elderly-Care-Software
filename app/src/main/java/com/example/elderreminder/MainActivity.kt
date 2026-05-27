@@ -47,7 +47,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         root.addView(TextView(this).apply {
-            text = "护眼休息提醒"
+            text = "老人关怀"
             textSize = 31f
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.brand_green_dark))
             typeface = android.graphics.Typeface.DEFAULT_BOLD

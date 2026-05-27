@@ -15,6 +15,7 @@ data class UsageSessionEvent(
 data class UsageSession(
     val packageName: String?,
     val durationMillis: Long,
+    val startTimeMillis: Long = 0L,
 ) {
     fun exceeds(minutes: Int): Boolean = durationMillis >= minutes * 60_000L
 }
@@ -52,6 +53,7 @@ class UsageSessionAnalyzer(
         return UsageSession(
             packageName = packageName,
             durationMillis = (nowMillis - start).coerceAtLeast(0L),
+            startTimeMillis = start,
         )
     }
 }

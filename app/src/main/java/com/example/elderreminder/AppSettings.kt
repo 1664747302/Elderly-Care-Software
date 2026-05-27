@@ -41,6 +41,11 @@ class AppSettings(context: Context) {
         get() = preferences.getInt(KEY_CURFEW_END_HOUR, 6)
         set(value) = preferences.edit().putInt(KEY_CURFEW_END_HOUR, value.coerceIn(0, 23)).apply()
 
+    // 新增：如果老人连续使用提醒后依旧没有停止使用手机，家人设置的重复弹窗和语音提醒间隔（单位：分钟）
+    var repeatedReminderIntervalMinutes: Int
+        get() = preferences.getInt(KEY_REPEATED_REMINDER_INTERVAL_MINUTES, DEFAULT_REPEATED_REMINDER_INTERVAL_MINUTES)
+        set(value) = preferences.edit().putInt(KEY_REPEATED_REMINDER_INTERVAL_MINUTES, value.coerceAtLeast(1)).apply()
+
     fun isCurfewActive(nowMillis: Long): Boolean {
         if (!curfewEnabled) return false
         val cal = java.util.Calendar.getInstance().apply { timeInMillis = nowMillis }
@@ -59,7 +64,8 @@ class AppSettings(context: Context) {
     companion object {
         const val DEFAULT_PIN = "1234"
         const val DEFAULT_REMINDER_MINUTES = 30
-        const val DEFAULT_REMINDER_TEXT = "爷爷，该休息一下了。请放下手机，看看远处，喝点水，活动活动身体。"
+        const val DEFAULT_REMINDER_TEXT = "家人，该休息一下了。请放下手机，看看远处，喝点水，活动活动身体。"
+        const val DEFAULT_REPEATED_REMINDER_INTERVAL_MINUTES = 5
 
         private const val KEY_PIN = "pin"
         private const val KEY_REMINDER_MINUTES = "reminder_minutes"
@@ -70,5 +76,6 @@ class AppSettings(context: Context) {
         private const val KEY_CURFEW_ENABLED = "curfew_enabled"
         private const val KEY_CURFEW_START_HOUR = "curfew_start_hour"
         private const val KEY_CURFEW_END_HOUR = "curfew_end_hour"
+        private const val KEY_REPEATED_REMINDER_INTERVAL_MINUTES = "repeated_reminder_interval_minutes"
     }
 }

@@ -138,7 +138,7 @@ class ReportActivity : AppCompatActivity() {
 
         if (records.isEmpty()) {
             listContainer.addView(TextView(this).apply {
-                text = "过去 7 天内无提醒记录，爷爷的用眼习惯非常好！"
+                text = "过去 7 天内无提醒记录，家人的用眼习惯非常好！"
                 textSize = 18f
                 setTextColor(0xFF555555.toInt())
                 setPadding(dp(12), dp(12), dp(12), dp(12))

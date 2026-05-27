@@ -19,20 +19,41 @@ class UsageReminderWorker(
         val now = System.currentTimeMillis()
         val isCurfew = settings.isCurfewActive(now)
 
-        // 根据是否为“夜间宵禁”确定提醒阈值和冷静期
+        // 根据是否为“夜间宵禁”确定提醒阈值和最长查询区间
         val thresholdMinutes = if (isCurfew) 2 else settings.reminderMinutes
         val thresholdMillis = thresholdMinutes * 60_000L
-        
-        val cooldownMillis = if (isCurfew) 2 * 60_000L else settings.reminderMinutes * 60_000L
-        val cooldownPassed = now - settings.lastReminderAtMillis >= cooldownMillis
 
-        if (cooldownPassed) {
-            // 获取更长一段时间的统计，确保不会遗漏检测
-            val events = readUsageEvents(now - thresholdMillis - FIFTEEN_MINUTES, now)
-            val session = UsageSessionAnalyzer(applicationContext.packageName).currentSession(events, now)
-            if (session.exceeds(thresholdMinutes)) {
+        // 获取比检测区间更长一段时间的统计，确保能追溯到当前前台运行会话的起始点
+        val maxQueryRangeMinutes = maxOf(settings.reminderMinutes, 180)
+        val events = readUsageEvents(now - maxQueryRangeMinutes * 60_000L - FIFTEEN_MINUTES, now)
+        val session = UsageSessionAnalyzer(applicationContext.packageName).currentSession(events, now)
+
+        if (session.packageName == null || session.durationMillis <= 0L) {
+            // 如果宵禁时间生效中，自动连环安排 2 分钟后的下一次单次高频检测
+            if (settings.isCurfewActive(System.currentTimeMillis())) {
+                enqueueNextCurfewCheck(applicationContext)
+            }
+            return Result.success()
+        }
+
+        if (session.exceeds(thresholdMinutes)) {
+            // 判定是否已经在当前的连续使用会话中提醒过
+            val alreadyRemindedInSession = settings.lastReminderAtMillis >= session.startTimeMillis
+
+            val cooldownMillis = if (isCurfew) {
+                2 * 60_000L
+            } else if (alreadyRemindedInSession) {
+                // 如果已在该会话提醒过且未停止使用手机，则按照家人设置的重复提醒间隔计算冷却时间
+                settings.repeatedReminderIntervalMinutes * 60_000L
+            } else {
+                settings.reminderMinutes * 60_000L
+            }
+
+            val cooldownPassed = now - settings.lastReminderAtMillis >= cooldownMillis
+
+            if (cooldownPassed) {
                 val reminderText = if (isCurfew) {
-                    "爷爷，现在已到深夜宵禁时间，您已经连续看手机超过两分钟了。为了您的睡眠和身体，请立即闭眼休息。"
+                    "家人，现在已到深夜宵禁时间，您已经连续看手机超过两分钟了。为了您的睡眠和身体，请立即闭眼休息。"
                 } else {
                     settings.reminderText
                 }
@@ -42,7 +63,7 @@ class UsageReminderWorker(
                     SpeechReminder.speak(applicationContext, reminderText, isCurfew)
                 }
                 settings.lastReminderAtMillis = now
-                
+
                 // 写入本地数据库，用于生成习惯周报
                 try {
                     val db = ReminderHistoryDbHelper(applicationContext)

@@ -15,7 +15,7 @@
 项目根目录是：
 
 ```text
-D:\文档\提醒
+D:\Project\提醒
 ```
 
 构建 debug APK：
@@ -24,7 +24,25 @@ D:\文档\提醒
 .\gradlew.bat assembleDebug
 ```
 
-2026-05-25 验证结果：通过。APK 输出路径：
+2.026-05-25 验证结果：通过。 APK 输出路径：...
+
+## 重复提醒功能更新 (2026-05-25)
+
+为了允许在连续使用时间超时并提醒后如果老人未停止使用手机，家人可以设定每隔几分钟重复提醒一次，我们对核心模块进行了如下升级：
+1. **`AppSettings.kt`**：
+   - 新增 `repeatedReminderIntervalMinutes` 设置项，存储如果未停止使用时的重复弹窗和语音提醒间隔（单位：分钟），默认值为 5 分钟，写入时保证至少为 1 分钟。
+2. **`SettingsActivity.kt` 设计页**：
+   - 新置“重复提醒间隔”文本框，用来供家人录入具体的重复间隔时间，并与保存流程和设置生命周期打通。
+3. **`UsageSessionAnalyzer.kt` 升级**：
+   - `UsageSession` 结构体新增 `startTimeMillis` 属性，用于指示当前处于前台的 App 会话的开始时间。
+   - `UsageSessionAnalyzer.currentSession` 在分析得到前台会话时，会自动回填 `startTimeMillis`。
+4. **`UsageReminderWorker.kt` 检测与冷却判定逻辑重构**：
+   - 将 UsageEvents 查询的区间扩大到 `now - maxOf(settings.reminderMinutes, 180) * 60_000L - 15分钟`。这样能完整追溯当前依然处于前台并且运行时间很长的 App 会话的实际开始时间。
+   - 提取出当前的 session。如果 session 的开始时间 `startTimeMillis` 晚于或等于上次触发提醒的时间 `lastReminderAtMillis`，说明在该使用会话中还**没有**发生过提醒。此时，冷却期为常规的 `settings.reminderMinutes` 分钟。
+   - 如果上次提醒的时间晚于会话的开始时间，说明已经在此会话中提醒过了。如果在这种情况下用户依然没有关闭前台应用（前台应用一直在使用），则将下一次的检测/提醒冷却期设定为家人设定的重复提醒时间 `settings.repeatedReminderIntervalMinutes` 分钟。
+   - 这不仅做到了判定老人有没有在该会话期间“停止使用手机”的闭环，更保证了在未停止使用时，能够精准在家人设置的间隔内重复触发通知与音频警告。
+5. **构建与测试**：
+   - 全套 JVM 端单元测试在 ASCII 副本下执行并全部通过，APP 本地构建成功。
 
 ```text
 app/build/outputs/apk/debug/app-debug.apk
@@ -50,7 +68,7 @@ cd D:\elder_reminder_ascii
 如果需要重建 ASCII 副本：
 
 ```powershell
-robocopy D:\文档\提醒 D:\elder_reminder_ascii /E /XD .git .gradle .idea app\build /XF local.properties
+robocopy D:\Project\提醒 D:\elder_reminder_ascii /E /XD .git .gradle .idea app\build /XF local.properties
 Set-Content D:\elder_reminder_ascii\local.properties 'sdk.dir=D\:\\Android\\Sdk'
 cd D:\elder_reminder_ascii
 .\gradlew.bat testDebugUnitTest
@@ -376,7 +394,7 @@ cd D:\elder_reminder_ascii
 
 - 每次完成代码编写、修复或功能调整后，必须把本次更新涉及的结构变化、功能变化、构建/测试结果、已知问题同步整合进 `agents.md`，避免后续 Hermes 重复扫描项目浪费 token。
 - 改动保持小而集中。当前 UI、后台任务、权限逻辑耦合较紧，跨文件改动要验证完整流程。
-- 源码改完后，在 `D:\文档\提醒` 跑：
+- 源码改完后，在 `D:\Project\提醒` 跑：
 
 ```powershell
 .\gradlew.bat assembleDebug

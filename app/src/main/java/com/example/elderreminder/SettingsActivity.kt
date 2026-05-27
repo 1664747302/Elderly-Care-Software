@@ -23,6 +23,7 @@ import android.provider.Settings
 class SettingsActivity : AppCompatActivity() {
     private lateinit var settings: AppSettings
     private lateinit var reminderMinutesInput: EditText
+    private lateinit var repeatedReminderIntervalInput: EditText
     private lateinit var reminderTextInput: EditText
     private lateinit var pinInput: EditText
     private lateinit var voiceCheckbox: CheckBox
@@ -64,6 +65,10 @@ class SettingsActivity : AppCompatActivity() {
         root.addView(label("提醒间隔（分钟，15 到 180）"))
         reminderMinutesInput = editText(settings.reminderMinutes.toString(), InputType.TYPE_CLASS_NUMBER)
         root.addView(reminderMinutesInput)
+
+        root.addView(label("重复提醒间隔（若超时后未停止使用，每隔几分钟提醒一次）"))
+        repeatedReminderIntervalInput = editText(settings.repeatedReminderIntervalMinutes.toString(), InputType.TYPE_CLASS_NUMBER)
+        root.addView(repeatedReminderIntervalInput)
 
         root.addView(label("语音提醒"))
         voiceCheckbox = CheckBox(this).apply {
@@ -212,11 +217,13 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun saveSettings() {
         val minutes = reminderMinutesInput.text.toString().toIntOrNull() ?: AppSettings.DEFAULT_REMINDER_MINUTES
+        val repeatedInterval = repeatedReminderIntervalInput.text.toString().toIntOrNull() ?: AppSettings.DEFAULT_REPEATED_REMINDER_INTERVAL_MINUTES
         val pin = pinInput.text.toString().ifBlank { AppSettings.DEFAULT_PIN }
         val startHour = curfewStartInput.text.toString().toIntOrNull() ?: 22
         val endHour = curfewEndInput.text.toString().toIntOrNull() ?: 6
 
         settings.reminderMinutes = minutes
+        settings.repeatedReminderIntervalMinutes = repeatedInterval
         settings.voiceEnabled = voiceCheckbox.isChecked
         settings.customAudioEnabled = customAudioCheckbox.isChecked
         settings.curfewEnabled = curfewCheckbox.isChecked

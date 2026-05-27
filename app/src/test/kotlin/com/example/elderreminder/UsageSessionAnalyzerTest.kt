@@ -35,6 +35,7 @@ class UsageSessionAnalyzerTest {
 
         assertThat(result.packageName).isEqualTo("com.shortvideo")
         assertThat(result.durationMillis).isEqualTo(1_800_000L)
+        assertThat(result.startTimeMillis).isEqualTo(100_000L)
         assertThat(result.exceeds(30)).isTrue()
     }
 
