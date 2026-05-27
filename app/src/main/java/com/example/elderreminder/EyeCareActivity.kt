@@ -105,9 +105,22 @@ class EyeCareActivity : AppCompatActivity() {
         ).apply { bottomMargin = dp(18) })
 
         root.addView(primaryButton("开始提醒") {
-            if (!UsagePermission.hasUsageAccess(this)) {
-                Toast.makeText(this, "请先开启使用情况访问权限", Toast.LENGTH_LONG).show()
-                startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+            val hasUsage = UsagePermission.hasUsageAccess(this)
+            val hasAccessibility = UsagePermission.hasAccessibilityAccess(this)
+            if (!hasUsage && !hasAccessibility) {
+                AlertDialog.Builder(this)
+                    .setTitle("开启守护提醒权限说明")
+                    .setMessage("为了能够精准、实时、省电地检测前台应用并提醒休息，本应用支持以下两种方式。强烈推荐开启【无障碍服务】以获得最好的实时闭环效果。\n\n" +
+                               "1. 开启无障碍服务 (推荐：秒级响应，无需后台轮询轮检测)\n" +
+                               "2. 开启使用情况访问权限 (备用：15分钟定时轮询监测模式)")
+                    .setPositiveButton("去开启无障碍") { _, _ ->
+                        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    }
+                    .setNegativeButton("去开启使用情况") { _, _ ->
+                        startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                    }
+                    .setNeutralButton("取消", null)
+                    .show()
                 return@primaryButton
             }
             ReminderScheduler.schedule(this)
@@ -161,11 +174,25 @@ class EyeCareActivity : AppCompatActivity() {
 
     private fun refreshStatus() {
         val hasUsageAccess = UsagePermission.hasUsageAccess(this)
-        statusText.text = if (hasUsageAccess) "状态：权限已开启" else "状态：需要开启权限"
-        detailText.text = if (hasUsageAccess) {
-            "点击“开始提醒”后，应用会在后台定期检查使用情况，并在长时间使用时发出通知和语音提醒。"
-        } else {
-            "Android 不允许应用自动开启使用情况权限。请进入“家人设置”开启相关权限。"
+        val hasAccessibility = UsagePermission.hasAccessibilityAccess(this)
+        
+        statusText.text = when {
+            hasAccessibility -> "状态：无障碍服务已开启 (推荐)"
+            hasUsageAccess -> "状态：使用情况权限已开启"
+            else -> "状态：需要开启权限"
+        }
+        
+        detailText.text = when {
+            hasAccessibility -> {
+                "无障碍守护已启动，实时监测前台切换，秒级精准响应且防沉迷效果最好。"
+            }
+            hasUsageAccess -> {
+                "使用情况模式已启用，在后台定期检查使用情况。\n" +
+                "提示：强烈建议启用“无障碍服务”以实现秒级精准提醒！点击下方“开启无障碍服务”进行配置。"
+            }
+            else -> {
+                "Android 不允许应用自动开启权限。请按需开启无障碍服务 (推荐) 或使用情况访问权限。"
+            }
         }
     }
 

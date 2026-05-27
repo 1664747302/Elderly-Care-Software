@@ -26,6 +26,34 @@ D:\Project\提醒
 
 2.026-05-25 验证结果：通过。 APK 输出路径：...
 
+为彻底解决传统“使用情况访问权限”在 Android 系统下由于 WorkManager 最小 15 分钟调度间隔限制而导致无法秒级精准、实时进行防沉迷/眼部休息提醒的问题，我们为应用引入并集成了基于系统【无障碍服务 (AccessibilityService)】的全新守护逻辑。该更新极大优化了实时性与功耗平衡，整体变动如下：
+
+### 1. 架构升级与逻辑重构
+* **添加无障碍服务 `ElderAccessibilityService.kt`**：
+  - 精准监听 `AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED` 事件，可以在老人切换应用或返回桌面时，瞬间（秒级）捕获当前交互的前台应用包名。
+  - 内部基于 `Handler` 维护了 10 秒级低功耗检测轮询守护计时器（仅在前台运行非系统桌面及非本应用的普通 App 时启动，极大避免后台过度消耗 CPU 和电池消耗）。
+  - 支持对亮/灭屏状态的动态监听。注册 `Intent.ACTION_SCREEN_OFF` 广播接收器，当屏幕熄灭或锁屏时自动暂停/清空前台应用计时计数。
+  - 自动通过 `packageManager.queryIntentActivities` 动态匹配设备上的系统桌面包名，并在会话判定中智能过滤掉系统桌面和本应用自身，确保不产生误判。
+  - 冷却时间机制与原 `UsageReminderWorker.kt` 逻辑深度对齐：区分普通（以常规或在此会话已提醒过的 `repeatedReminderIntervalMinutes` 为准）与夜间宵禁限值（以 2 分钟为限值及冷却阈值）。
+* **`UsagePermission.kt` 接口检测升级**：
+  - 新增 `hasAccessibilityAccess(Context)` 函数，用于读取系统 `Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES` 状态，判断当前该无障碍服务是否被用户成功授权并开启。
+* **`AndroidManifest.xml` 与服务声明**：
+  - 注册 `ElderAccessibilityService` 服务组件，附加 `android.permission.BIND_ACCESSIBILITY_SERVICE` 系统绑定强制校验权限。
+  - 在 `res/xml/` 下扩展声明 `accessibility_service_config.xml` 配置，明确仅监听 `typeWindowStateChanged` 事件类型，且声明该服务仅有基础事件分派权限，保障用户隐私不外泄。
+
+### 2. UI 交互体验优化
+* **`EyeCareActivity.kt` 权限与引导重构**：
+  - 刷新状态时支持双轨判定：优先展示“无障碍服务已开启 (推荐)”状态；未开启无障碍时，降级检查并显示“使用情况权限已开启”。
+  - 细化用户点击“开始提醒”时的提示逻辑：若两者皆未授权，则弹窗详细告知优势与劣势，并提供“去开启无障碍”和“去开启使用情况”的明确分级双入口引导。
+* **`SettingsActivity.kt` 家人配置面板升级**：
+  - 在“系统使用权限设置”面板中高位新增“开启无障碍服务 (推荐首选)”选项按钮，支持家人进入页面直接快速跳转。
+
+### 3. 构建与验证
+* 原 15 分钟 WorkManager 任务依然保留，确保在没有开启无障碍或低内存环境下的多重降级备用保证。
+* 新增无障碍配置 `res/values/strings.xml` 中关于开启该服务时的描述性文本引导 (`accessibility_desc`)。
+* 源码已在 `D:\Project\Elderly Care Software` 编译完毕。
+* 使用 `robocopy` 镜像并分发代码副本至 `D:\elder_reminder_ascii` 目录下，该处的 JUnit 单元测试已全部通过！
+
 ## 重复提醒功能更新 (2026-05-25)
 
 为了允许在连续使用时间超时并提醒后如果老人未停止使用手机，家人可以设定每隔几分钟重复提醒一次，我们对核心模块进行了如下升级：

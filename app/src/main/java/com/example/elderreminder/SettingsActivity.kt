@@ -195,6 +195,18 @@ class SettingsActivity : AppCompatActivity() {
 
         root.addView(label("系统使用权限设置"))
         root.addView(Button(this).apply {
+            text = "开启无障碍服务 (推荐首选)"
+            textSize = 20f
+            setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.brand_green_dark))
+            setOnClickListener { 
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply { bottomMargin = dp(12) })
+
+        root.addView(Button(this).apply {
             text = "开启使用情况权限"
             textSize = 20f
             setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.brand_green_dark))
