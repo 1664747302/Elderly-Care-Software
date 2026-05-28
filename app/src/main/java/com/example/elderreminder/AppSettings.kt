@@ -65,6 +65,10 @@ class AppSettings(context: Context) {
         get() = preferences.getString(KEY_DEEPSEEK_API_URL, "https://api.deepseek.com/v1") ?: "https://api.deepseek.com/v1"
         set(value) = preferences.edit().putString(KEY_DEEPSEEK_API_URL, value.trim()).apply()
 
+    var deepseekModel: String
+        get() = preferences.getString(KEY_DEEPSEEK_MODEL, "deepseek-v4-flash") ?: "deepseek-v4-flash"
+        set(value) = preferences.edit().putString(KEY_DEEPSEEK_MODEL, value.trim()).apply()
+
     var lastAiEvaluationTimeMillis: Long
         get() = preferences.getLong(KEY_LAST_AI_EVALUATION_TIME, 0L)
         set(value) = preferences.edit().putLong(KEY_LAST_AI_EVALUATION_TIME, value).apply()
@@ -72,6 +76,34 @@ class AppSettings(context: Context) {
     var lastAiEvaluationResult: String
         get() = preferences.getString(KEY_LAST_AI_EVALUATION_RESULT, "") ?: ""
         set(value) = preferences.edit().putString(KEY_LAST_AI_EVALUATION_RESULT, value).apply()
+
+    var userAge: String
+        get() = preferences.getString(KEY_USER_AGE, "") ?: ""
+        set(value) = preferences.edit().putString(KEY_USER_AGE, value.trim()).apply()
+
+    var userGender: String
+        get() = preferences.getString(KEY_USER_GENDER, "") ?: ""
+        set(value) = preferences.edit().putString(KEY_USER_GENDER, value.trim()).apply()
+
+    var userChronicDiseases: String
+        get() = preferences.getString(KEY_USER_CHRONIC_DISEASES, "") ?: ""
+        set(value) = preferences.edit().putString(KEY_USER_CHRONIC_DISEASES, value.trim()).apply()
+
+    var bpSystolicMin: Int
+        get() = preferences.getInt(KEY_BP_SYSTOLIC_MIN, 90)
+        set(value) = preferences.edit().putInt(KEY_BP_SYSTOLIC_MIN, value.coerceIn(40, 260)).apply()
+
+    var bpSystolicMax: Int
+        get() = preferences.getInt(KEY_BP_SYSTOLIC_MAX, 139)
+        set(value) = preferences.edit().putInt(KEY_BP_SYSTOLIC_MAX, value.coerceIn(40, 260)).apply()
+
+    var bpDiastolicMin: Int
+        get() = preferences.getInt(KEY_BP_DIASTOLIC_MIN, 60)
+        set(value) = preferences.edit().putInt(KEY_BP_DIASTOLIC_MIN, value.coerceIn(30, 180)).apply()
+
+    var bpDiastolicMax: Int
+        get() = preferences.getInt(KEY_BP_DIASTOLIC_MAX, 89)
+        set(value) = preferences.edit().putInt(KEY_BP_DIASTOLIC_MAX, value.coerceIn(30, 180)).apply()
 
     fun isCurfewActive(nowMillis: Long): Boolean {
         if (!curfewEnabled) return false
@@ -110,7 +142,15 @@ class AppSettings(context: Context) {
         private const val KEY_REST_GRACE_PERIOD_MINUTES = "rest_grace_period_minutes"
         private const val KEY_DEEPSEEK_API_KEY = "deepseek_api_key"
         private const val KEY_DEEPSEEK_API_URL = "deepseek_api_url"
+        private const val KEY_DEEPSEEK_MODEL = "deepseek_model"
         private const val KEY_LAST_AI_EVALUATION_TIME = "last_ai_evaluation_time"
         private const val KEY_LAST_AI_EVALUATION_RESULT = "last_ai_evaluation_result"
+        private const val KEY_USER_AGE = "user_age"
+        private const val KEY_USER_GENDER = "user_gender"
+        private const val KEY_USER_CHRONIC_DISEASES = "user_chronic_diseases"
+        private const val KEY_BP_SYSTOLIC_MIN = "bp_systolic_min"
+        private const val KEY_BP_SYSTOLIC_MAX = "bp_systolic_max"
+        private const val KEY_BP_DIASTOLIC_MIN = "bp_diastolic_min"
+        private const val KEY_BP_DIASTOLIC_MAX = "bp_diastolic_max"
     }
 }

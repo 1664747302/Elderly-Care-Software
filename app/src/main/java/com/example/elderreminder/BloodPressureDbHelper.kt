@@ -89,6 +89,35 @@ class BloodPressureDbHelper(context: Context) : SQLiteOpenHelper(context, DATABA
         return list
     }
 
+    fun getRecordsSince(sinceDate: String): List<BloodPressureRecord> {
+        val list = mutableListOf<BloodPressureRecord>()
+        val db = readableDatabase
+        val cursor = db.query(
+            TABLE_BLOOD_PRESSURE,
+            null,
+            "$COLUMN_DATE >= ?",
+            arrayOf(sinceDate),
+            null, null,
+            "$COLUMN_DATE DESC, $COLUMN_TIMESTAMP DESC"
+        )
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                list.add(
+                    BloodPressureRecord(
+                        id = c.getLong(c.getColumnIndexOrThrow(COLUMN_ID)),
+                        date = c.getString(c.getColumnIndexOrThrow(COLUMN_DATE)),
+                        period = c.getString(c.getColumnIndexOrThrow(COLUMN_PERIOD)),
+                        systolic = c.getInt(c.getColumnIndexOrThrow(COLUMN_SYSTOLIC)),
+                        diastolic = c.getInt(c.getColumnIndexOrThrow(COLUMN_DIASTOLIC)),
+                        heartRate = c.getInt(c.getColumnIndexOrThrow(COLUMN_HEART_RATE)),
+                        timestamp = c.getLong(c.getColumnIndexOrThrow(COLUMN_TIMESTAMP))
+                    )
+                )
+            }
+        }
+        return list
+    }
+
     fun getRecentRecords(limit: Int = 21): List<BloodPressureRecord> {
         val list = mutableListOf<BloodPressureRecord>()
         val db = readableDatabase

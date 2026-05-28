@@ -4,6 +4,8 @@ import android.app.DatePickerDialog
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Bundle
 import android.text.InputType
@@ -40,6 +42,7 @@ class BloodPressureActivity : AppCompatActivity() {
     private lateinit var settings: AppSettings
     private lateinit var aiButton: Button
     private lateinit var aiResultView: TextView
+    private lateinit var chartView: BloodPressureChartView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -167,13 +170,61 @@ class BloodPressureActivity : AppCompatActivity() {
         
         aiCard.addView(aiTitleRow)
 
+        // Row above the report (aiResultView) containing two parallel entry buttons
+        val entryRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(6), 0, dp(6))
+        }
+
+        val fillProfileBtn = Button(this).apply {
+            text = "填写资料 📝"
+            textSize = 16f
+            setTextColor(ContextCompat.getColor(this@BloodPressureActivity, R.color.brand_green_dark))
+            background = ContextCompat.getDrawable(this@BloodPressureActivity, R.drawable.button_primary)
+            // Make background semi-transparent green or light gray to make it parallel and parallel styled
+            val gd = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0x1A1F6B45) // 10% alpha of brand_green
+                cornerRadius = dp(6).toFloat()
+                setStroke(dp(1), 0xFF1F6B45.toInt())
+            }
+            background = gd
+            setOnClickListener {
+                showFillProfileDialog()
+            }
+        }
+        entryRow.addView(fillProfileBtn, LinearLayout.LayoutParams(0, dp(44), 1f).apply { rightMargin = dp(8) })
+
+        val customizeRangeBtn = Button(this).apply {
+            text = "安全范围 ⚙️"
+            textSize = 16f
+            setTextColor(ContextCompat.getColor(this@BloodPressureActivity, R.color.brand_green_dark))
+            val gd = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0x1A1F6B45) // 10% alpha of brand_green
+                cornerRadius = dp(6).toFloat()
+                setStroke(dp(1), 0xFF1F6B45.toInt())
+            }
+            background = gd
+            setOnClickListener {
+                showCustomizeRangeDialog()
+            }
+        }
+        entryRow.addView(customizeRangeBtn, LinearLayout.LayoutParams(0, dp(44), 1f))
+
+        aiCard.addView(entryRow, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = dp(8)
+            bottomMargin = dp(10)
+        })
+
         aiCard.addView(View(this).apply {
             setBackgroundColor(0xFFEEEEEE.toInt())
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             dp(1)
         ).apply {
-            topMargin = dp(8)
             bottomMargin = dp(10)
         })
 
@@ -208,6 +259,73 @@ class BloodPressureActivity : AppCompatActivity() {
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { bottomMargin = dp(18) })
 
+        // 近七天血压趋势图表卡片
+        val chartCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = ContextCompat.getDrawable(this@BloodPressureActivity, R.drawable.status_panel)
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+
+        val chartTitleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        chartTitleRow.addView(TextView(this).apply {
+            text = "📊 近七天血压趋势 (平均每日)"
+            textSize = 20f
+            setTextColor(ContextCompat.getColor(this@BloodPressureActivity, R.color.brand_green_dark))
+            typeface = Typeface.DEFAULT_BOLD
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+
+        val legendLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        // Systolic legend
+        legendLayout.addView(View(this).apply {
+            setBackgroundColor(0xFFD32F2F.toInt())
+        }, LinearLayout.LayoutParams(dp(12), dp(12)).apply { rightMargin = dp(4) })
+        legendLayout.addView(TextView(this).apply {
+            text = "高压"
+            textSize = 13f
+            setTextColor(0xFF555555.toInt())
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(10) })
+
+        // Diastolic legend
+        legendLayout.addView(View(this).apply {
+            setBackgroundColor(0xFF1976D2.toInt())
+        }, LinearLayout.LayoutParams(dp(12), dp(12)).apply { rightMargin = dp(4) })
+        legendLayout.addView(TextView(this).apply {
+            text = "低压"
+            textSize = 13f
+            setTextColor(0xFF555555.toInt())
+        })
+
+        chartTitleRow.addView(legendLayout, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        chartCard.addView(chartTitleRow)
+
+        chartCard.addView(View(this).apply {
+            setBackgroundColor(0xFFEEEEEE.toInt())
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(1)
+        ).apply {
+            topMargin = dp(8)
+            bottomMargin = dp(10)
+        })
+
+        chartView = BloodPressureChartView(this)
+        chartCard.addView(chartView, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(180)
+        ))
+
+        root.addView(chartCard, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(18) })
+
         // Cards Container for Morning, Noon, Evening options
         cardsContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -226,14 +344,39 @@ class BloodPressureActivity : AppCompatActivity() {
             bottomMargin = dp(16)
         })
 
-        // Recent Records Title
-        root.addView(TextView(this).apply {
+        // Recent Records Title Row with fold/unfold button
+        val historyTitleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(10))
+        }
+
+        val historyTitleTv = TextView(this).apply {
             text = "最近血压记录 (历史列表)"
             textSize = 21f
             setTextColor(ContextCompat.getColor(this@BloodPressureActivity, R.color.brand_green_dark))
             typeface = Typeface.DEFAULT_BOLD
-            setPadding(0, 0, 0, dp(10))
-        })
+        }
+        historyTitleRow.addView(historyTitleTv, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+
+        val foldBtn = Button(this).apply {
+            text = "收起 📁"
+            textSize = 16f
+            setTextColor(ContextCompat.getColor(this@BloodPressureActivity, R.color.brand_green_dark))
+            setBackgroundColor(0x00000000)
+            setOnClickListener {
+                if (historyContainer.visibility == View.VISIBLE) {
+                    historyContainer.visibility = View.GONE
+                    text = "展开 📂"
+                } else {
+                    historyContainer.visibility = View.VISIBLE
+                    text = "收起 📁"
+                }
+            }
+        }
+        historyTitleRow.addView(foldBtn, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+
+        root.addView(historyTitleRow)
 
         // History container list
         historyContainer = LinearLayout(this).apply {
@@ -254,12 +397,37 @@ class BloodPressureActivity : AppCompatActivity() {
         // Update date display
         dateDisplayView.text = "$displayDate\n($weekday) 📅"
 
+        // Update 7-day average chart
+        val chartData = mutableListOf<DailyAverage>()
+        val tempCal = selectedCalendar.clone() as Calendar
+        tempCal.add(Calendar.DAY_OF_YEAR, -6)
+        val chartDateFormatter = SimpleDateFormat("MM-dd", Locale.getDefault())
+
+        for (i in 0 until 7) {
+            val queryDateStr = dateFormatter.format(tempCal.time)
+            val labelStr = chartDateFormatter.format(tempCal.time)
+            val dayRecords = dbHelper.getRecordsForDate(queryDateStr)
+            if (dayRecords.isEmpty()) {
+                chartData.add(DailyAverage(labelStr, 0, 0))
+            } else {
+                val avgSys = dayRecords.map { it.systolic }.average().toInt()
+                val avgDia = dayRecords.map { it.diastolic }.average().toInt()
+                chartData.add(DailyAverage(labelStr, avgSys, avgDia))
+            }
+            tempCal.add(Calendar.DAY_OF_YEAR, 1)
+        }
+        chartView.setData(chartData)
+
         // Update Morning, Noon, Evening cards
         cardsContainer.removeAllViews()
+        val sysRangeStr = "${settings.bpSystolicMin}-${settings.bpSystolicMax}"
+        val diaRangeStr = "${settings.bpDiastolicMin}-${settings.bpDiastolicMax}"
+        val rangeDesc = "$sysRangeStr / $diaRangeStr"
+
         val periods = listOf(
-            PeriodConfig("早晨", "🌅 早晨自测 (起床后/早餐前)", "90-139 / 60-89"),
-            PeriodConfig("中午", "☀️ 中午自测 (饭前半小时/饭后)", "90-139 / 60-89"),
-            PeriodConfig("晚上", "🌙 晚上自测 (临睡前半小时)", "90-139 / 60-89")
+            PeriodConfig("早晨", "🌅 早晨自测 (起床后/早餐前)", rangeDesc),
+            PeriodConfig("中午", "☀️ 中午自测 (饭前半小时/饭后)", rangeDesc),
+            PeriodConfig("晚上", "🌙 晚上自测 (临睡前半小时)", rangeDesc)
         )
 
         for (config in periods) {
@@ -516,6 +684,299 @@ class BloodPressureActivity : AppCompatActivity() {
         }
     }
 
+    private fun showFillProfileDialog() {
+        val diseasesList = settings.userChronicDiseases.split("、", ",")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toMutableList()
+
+        val mainContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(10), dp(20), dp(10))
+        }
+
+        // Basic Profile Info inputs
+        val (agePanel, ageInput) = createDialogInputField(
+            this,
+            "使用人员年龄 (岁) :",
+            "请输入使用人员年龄，例如: 72",
+            settings.userAge,
+            InputType.TYPE_CLASS_NUMBER
+        )
+        mainContainer.addView(agePanel)
+
+        val (genderPanel, genderInput) = createDialogInputField(
+            this,
+            "使用人员性别 :",
+            "请输入男/女或不填",
+            settings.userGender,
+            InputType.TYPE_CLASS_TEXT
+        )
+        mainContainer.addView(genderPanel)
+
+        // Chronic disease tags container
+        val diseaseCardLabel = TextView(this).apply {
+            text = "🩺 基础疾病与医学史 (可卡片式增删) :"
+            textSize = 17f
+            setTextColor(0xFF333333.toInt())
+            setPadding(0, dp(10), 0, dp(6))
+        }
+        mainContainer.addView(diseaseCardLabel)
+
+        // The programmatic FlowLayout/Flex container for tag cards
+        val tagContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        fun drawDiseaseTags() {
+            tagContainer.removeAllViews()
+            if (diseasesList.isEmpty()) {
+                tagContainer.addView(TextView(this@BloodPressureActivity).apply {
+                    text = "暂未添加任何基础疾病（例如：高血压3级、糖尿病2型）。"
+                    textSize = 15f
+                    setTextColor(0xFF888888.toInt())
+                    setPadding(0, dp(4), 0, dp(8))
+                })
+            } else {
+                for (disease in diseasesList) {
+                    val tagRow = LinearLayout(this@BloodPressureActivity).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        background = android.graphics.drawable.GradientDrawable().apply {
+                            setColor(0x0D000000) // 5% dark alpha gray
+                            cornerRadius = dp(6).toFloat()
+                            setStroke(dp(1), 0xFFDDDDDD.toInt())
+                        }
+                        setPadding(dp(12), dp(8), dp(12), dp(8))
+                    }
+                    val tagText = TextView(this@BloodPressureActivity).apply {
+                        text = disease
+                        textSize = 16f
+                        setTextColor(0xFF333333.toInt())
+                    }
+                    tagRow.addView(tagText, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+
+                    // Edit Button
+                    val editBtn = TextView(this@BloodPressureActivity).apply {
+                        text = "✏️ 修改"
+                        textSize = 15f
+                        setTextColor(ContextCompat.getColor(this@BloodPressureActivity, R.color.brand_green))
+                        setPadding(dp(8), dp(4), dp(8), dp(4))
+                        setSingleLine(true)
+                        setOnClickListener {
+                            val editInput = EditText(this@BloodPressureActivity).apply {
+                                setText(disease)
+                                setSingleLine(true)
+                                selectAll()
+                            }
+                            AlertDialog.Builder(this@BloodPressureActivity)
+                                .setTitle("修改基础疾病")
+                                .setView(editInput)
+                                .setPositiveButton("确认") { _, _ ->
+                                    val newText = editInput.text.toString().trim()
+                                    if (newText.isNotEmpty()) {
+                                        val idx = diseasesList.indexOf(disease)
+                                        if (idx != -1) {
+                                            diseasesList[idx] = newText
+                                            drawDiseaseTags()
+                                        }
+                                    }
+                                }
+                                .setNegativeButton("取消", null)
+                                .show()
+                        }
+                    }
+                    tagRow.addView(editBtn, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+
+                    // Delete Button
+                    val delBtn = TextView(this@BloodPressureActivity).apply {
+                        text = "❌ 删除"
+                        textSize = 15f
+                        setTextColor(0xFFD32F2F.toInt())
+                        setPadding(dp(8), dp(4), dp(8), dp(4))
+                        setSingleLine(true)
+                        setOnClickListener {
+                            diseasesList.remove(disease)
+                            drawDiseaseTags()
+                        }
+                    }
+                    tagRow.addView(delBtn, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+
+                    tagContainer.addView(tagRow, LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = dp(6) })
+                }
+            }
+        }
+
+        // Draw initial tag state
+        drawDiseaseTags()
+        mainContainer.addView(tagContainer)
+
+        // Add a new disease prompt row
+        val addRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(6), 0, dp(10))
+        }
+        val addInput = EditText(this).apply {
+            hint = "添加新疾病，如：高血压3级"
+            textSize = 16f
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+        }
+        addRow.addView(addInput, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+
+        val addBtn = Button(this).apply {
+            text = "添加 ➕"
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+            background = ContextCompat.getDrawable(this@BloodPressureActivity, R.drawable.button_primary)
+            setOnClickListener {
+                val newDisease = addInput.text.toString().trim()
+                if (newDisease.isNotEmpty()) {
+                    if (!diseasesList.contains(newDisease)) {
+                        diseasesList.add(newDisease)
+                        drawDiseaseTags()
+                    }
+                    addInput.setText("")
+                }
+            }
+        }
+        addRow.addView(addBtn, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            leftMargin = dp(8)
+        })
+        mainContainer.addView(addRow)
+
+        AlertDialog.Builder(this)
+            .setTitle("填写使用人员资料")
+            .setView(mainContainer)
+            .setPositiveButton("保存资料", null)
+            .setNegativeButton("取消", null)
+            .show()
+            .apply {
+                getButton(DialogInterface.BUTTON_POSITIVE).setTextColor(
+                    ContextCompat.getColor(this@BloodPressureActivity, R.color.brand_green_dark)
+                )
+                getButton(DialogInterface.BUTTON_NEGATIVE).setTextColor(0xFF777777.toInt())
+
+                getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                    val age = ageInput.text.toString().trim()
+                    val gender = genderInput.text.toString().trim()
+                    val diseasesMerged = diseasesList.joinToString("、")
+
+                    settings.userAge = age
+                    settings.userGender = gender
+                    settings.userChronicDiseases = diseasesMerged
+
+                    Toast.makeText(this@BloodPressureActivity, "资料保存完成", Toast.LENGTH_SHORT).show()
+                    dismiss()
+                }
+            }
+    }
+
+    private fun showCustomizeRangeDialog() {
+        val dialogLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(10), dp(20), dp(10))
+        }
+
+        val (sysMinPanel, sysMinInput) = createDialogInputField(
+            this,
+            "收缩压 (高压) 正常下限 (mmHg) :",
+            "默认值: 90",
+            settings.bpSystolicMin.toString(),
+            InputType.TYPE_CLASS_NUMBER
+        )
+        dialogLayout.addView(sysMinPanel)
+
+        val (sysMaxPanel, sysMaxInput) = createDialogInputField(
+            this,
+            "收缩压 (高压) 正常上限 (mmHg) :",
+            "默认值: 139",
+            settings.bpSystolicMax.toString(),
+            InputType.TYPE_CLASS_NUMBER
+        )
+        dialogLayout.addView(sysMaxPanel)
+
+        val (diaMinPanel, diaMinInput) = createDialogInputField(
+            this,
+            "舒张压 (低压) 正常下限 (mmHg) :",
+            "默认值: 60",
+            settings.bpDiastolicMin.toString(),
+            InputType.TYPE_CLASS_NUMBER
+        )
+        dialogLayout.addView(diaMinPanel)
+
+        val (diaMaxPanel, diaMaxInput) = createDialogInputField(
+            this,
+            "舒张压 (低压) 正常上限 (mmHg) :",
+            "默认值: 89",
+            settings.bpDiastolicMax.toString(),
+            InputType.TYPE_CLASS_NUMBER
+        )
+        dialogLayout.addView(diaMaxPanel)
+
+        AlertDialog.Builder(this)
+            .setTitle("自定义血压安全范围")
+            .setView(dialogLayout)
+            .setPositiveButton("确认保存", null)
+            .setNegativeButton("恢复默认", null)
+            .show()
+            .apply {
+                getButton(DialogInterface.BUTTON_POSITIVE).setTextColor(
+                    ContextCompat.getColor(this@BloodPressureActivity, R.color.brand_green_dark)
+                )
+                getButton(DialogInterface.BUTTON_NEGATIVE).setTextColor(0xFF777777.toInt())
+
+                getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                    val sMin = sysMinInput.text.toString().toIntOrNull()
+                    val sMax = sysMaxInput.text.toString().toIntOrNull()
+                    val dMin = diaMinInput.text.toString().toIntOrNull()
+                    val dMax = diaMaxInput.text.toString().toIntOrNull()
+
+                    if (sMin == null || sMax == null || dMin == null || dMax == null) {
+                        Toast.makeText(this@BloodPressureActivity, "请完整填写所有范围数值", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+
+                    if (sMin !in 40..260 || sMax !in 40..260 || dMin !in 30..180 || dMax !in 30..180) {
+                        Toast.makeText(this@BloodPressureActivity, "填写的数值超出安全调节区间，请重新输入", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+
+                    if (sMin >= sMax) {
+                        Toast.makeText(this@BloodPressureActivity, "高压下限不能高于或等于上限", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+
+                    if (dMin >= dMax) {
+                        Toast.makeText(this@BloodPressureActivity, "低压下限不能高于或等于上限", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+
+                    settings.bpSystolicMin = sMin
+                    settings.bpSystolicMax = sMax
+                    settings.bpDiastolicMin = dMin
+                    settings.bpDiastolicMax = dMax
+
+                    Toast.makeText(this@BloodPressureActivity, "血压安全范围配置完成", Toast.LENGTH_SHORT).show()
+                    refreshData()
+                    dismiss()
+                }
+
+                getButton(DialogInterface.BUTTON_NEGATIVE).setOnClickListener {
+                    settings.bpSystolicMin = 90
+                    settings.bpSystolicMax = 139
+                    settings.bpDiastolicMin = 60
+                    settings.bpDiastolicMax = 89
+                    Toast.makeText(this@BloodPressureActivity, "已成功恢复默认范围 (90-139 / 60-89)", Toast.LENGTH_SHORT).show()
+                    refreshData()
+                    dismiss()
+                }
+            }
+    }
+
     private fun showFillDialog(periodKey: String, existing: BloodPressureRecord?) {
         val dateStr = dateFormatter.format(selectedCalendar.time)
         val displayDate = displayDateFormatter.format(selectedCalendar.time)
@@ -537,7 +998,7 @@ class BloodPressureActivity : AppCompatActivity() {
         val (sysPanel, sysInput) = createDialogInputField(
             this,
             "高压 (收缩压) mmHg:",
-            "一般在 90 - 139 之间",
+            "推荐范围 ${settings.bpSystolicMin} - ${settings.bpSystolicMax}",
             existing?.systolic?.toString() ?: "120",
             InputType.TYPE_CLASS_NUMBER
         )
@@ -547,7 +1008,7 @@ class BloodPressureActivity : AppCompatActivity() {
         val (diaPanel, diaInput) = createDialogInputField(
             this,
             "低压 (舒张压) mmHg:",
-            "一般在 60 - 89 之间",
+            "推荐范围 ${settings.bpDiastolicMin} - ${settings.bpDiastolicMax}",
             existing?.diastolic?.toString() ?: "80",
             InputType.TYPE_CLASS_NUMBER
         )
@@ -662,10 +1123,15 @@ class BloodPressureActivity : AppCompatActivity() {
     }
 
     private fun evaluateBloodPressure(systolic: Int, diastolic: Int): BPStatus {
+        val sysMin = settings.bpSystolicMin
+        val sysMax = settings.bpSystolicMax
+        val diaMin = settings.bpDiastolicMin
+        val diaMax = settings.bpDiastolicMax
+
         return when {
-            systolic >= 140 || diastolic >= 90 -> BPStatus.HIGH
-            systolic < 90 || diastolic < 60 -> BPStatus.LOW
-            systolic in 120..139 || diastolic in 80..89 -> BPStatus.PRE_HIGH
+            systolic > sysMax || diastolic > diaMax -> BPStatus.HIGH
+            systolic < sysMin || diastolic < diaMin -> BPStatus.LOW
+            systolic in (sysMax - 19)..sysMax || diastolic in (diaMax - 9)..diaMax -> BPStatus.PRE_HIGH
             else -> BPStatus.NORMAL
         }
     }
@@ -728,13 +1194,32 @@ class BloodPressureActivity : AppCompatActivity() {
                 urlConnection.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 urlConnection.setRequestProperty("Authorization", "Bearer $apiKey")
 
-                val systemPrompt = "你是一位资深的心血管医生。请阅读用户近 30 天的血压和心率变化数据，并按以下严格的格式输出近期健康评分与建议。不要多余的寒暄，直接输出以下结构：\\n\\n### 📊 近期综合健康评分：[请评估一个0-100的分数，并说明主因]\\n\\n### 📈 数值趋势特征：\\n- [如：清晨血压偏高/波动较大/心率平稳等]\\n\\n### 🍎 针对性作息与饮食建议：\\n1. [建议1]\\n2. [建议2]\\n\\n免责声明：此评估基于历史数据生成，仅供参考，不作为确诊与药物治疗依据。"
+                val systemPrompt = "你是一位资深的心血管医生。请阅读用户近 30 天的血压和心率变化数据，并按以下严格的格式输出近期健康评分与建议。不要多余的寒暄，直接输出以下结构：\\\\n\\\\n### 📊 近期综合健康评分：[请评估一个0-100的分数，并说明主因]\\\\n\\\\n### 📈 数值趋势特征：\\\\n- [如：清晨血压偏高/波动较大/心率平稳等]\\\\n\\\\n### 🍎 针对性作息与饮食建议：\\\\n1. [建议1]\\\\n2. [建议2]\\\\n\\\\n免责声明：此评估基于历史数据生成，仅供参考，不作为确诊与药物治疗依据。"
+                
+                val profileInfo = StringBuilder()
+                if (settings.userAge.isNotEmpty()) {
+                    profileInfo.append("年龄：${settings.userAge}岁；")
+                }
+                if (settings.userGender.isNotEmpty()) {
+                    profileInfo.append("性别：${settings.userGender}；")
+                }
+                if (settings.userChronicDiseases.isNotEmpty()) {
+                    profileInfo.append("基础病与医学史：${settings.userChronicDiseases}；")
+                }
+                val profileStr = if (profileInfo.isNotEmpty()) "使用人员基本信息：${profileInfo.toString()}\\n" else ""
+
                 val safeUserContent = dataStr.replace("\\", "\\\\")
                     .replace("\"", "\\\"")
                     .replace("\n", "\\n")
                     .replace("\r", "")
+                
+                val safeProfileStr = profileStr.replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\n", "\\n")
+                    .replace("\r", "")
 
-                val jsonBody = "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"system\",\"content\":\"$systemPrompt\"},{\"role\":\"user\",\"content\":\"近30天测得的血压数据如下：\\n$safeUserContent\"}],\"temperature\":0.3}"
+                val model = settings.deepseekModel.ifBlank { "deepseek-chat" }
+                val jsonBody = "{\"model\":\"$model\",\"messages\":[{\"role\":\"system\",\"content\":\"$systemPrompt\"},{\"role\":\"user\",\"content\":\"${safeProfileStr}近30天测得的血压数据如下：\\\\n$safeUserContent\"}],\"temperature\":0.3}"
 
                 urlConnection.outputStream.use { os ->
                     val bytes = jsonBody.toByteArray(Charsets.UTF_8)
@@ -823,4 +1308,116 @@ class BloodPressureActivity : AppCompatActivity() {
         HIGH("血压偏高", 0xFFC62828.toInt(), "血压偏高，建议多躺下休息！如持续偏高请咨询医生意见。"), // Dark Red
         LOW("血压偏低", 0xFF1565C0.toInt(), "血压有些偏低，请适度补充营养与水分，站立时动作要放缓下身。") // Dark Blue
     }
+}
+
+data class DailyAverage(
+    val dateLabel: String,
+    val avgSystolic: Int,
+    val avgDiastolic: Int
+)
+
+class BloodPressureChartView(context: Context) : View(context) {
+    private var chartData: List<DailyAverage> = emptyList()
+
+    private val paintSystolic = Paint().apply {
+        color = 0xFFD32F2F.toInt() // Red for systolic
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+
+    private val paintDiastolic = Paint().apply {
+        color = 0xFF1976D2.toInt() // Blue for diastolic
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+
+    private val paintLine = Paint().apply {
+        color = 0xFFCCCCCC.toInt()
+        strokeWidth = dpToPx(1f)
+        style = Paint.Style.STROKE
+        isAntiAlias = true
+    }
+
+    private val paintLabel = Paint().apply {
+        color = 0xFF555555.toInt()
+        textSize = dpToPx(12f)
+        textAlign = Paint.Align.CENTER
+        isAntiAlias = true
+    }
+
+    private val paintValText = Paint().apply {
+        color = 0xFF333333.toInt()
+        textSize = dpToPx(10f)
+        textAlign = Paint.Align.CENTER
+        isAntiAlias = true
+    }
+
+    fun setData(data: List<DailyAverage>) {
+        this.chartData = data
+        invalidate()
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        if (chartData.isEmpty()) return
+
+        val w = width.toFloat()
+        val h = height.toFloat()
+
+        val paddingLeft = dpToPx(20f)
+        val paddingRight = dpToPx(20f)
+        val paddingTop = dpToPx(20f)
+        val paddingBottom = dpToPx(25f)
+
+        val graphWidth = w - paddingLeft - paddingRight
+        val graphHeight = h - paddingTop - paddingBottom
+
+        // Draw baseline
+        canvas.drawLine(paddingLeft, h - paddingBottom, w - paddingRight, h - paddingBottom, paintLine)
+
+        val count = chartData.size
+        val stepX = graphWidth / count
+
+        // Max possible scale is 200 mmHg
+        val maxVal = 200f
+
+        for (i in 0 until count) {
+            val item = chartData[i]
+            val x = paddingLeft + (i * stepX) + (stepX / 2)
+
+            if (item.avgSystolic > 0 && item.avgDiastolic > 0) {
+                // Width of bars: we draw two adjacent bars
+                val barWidth = stepX * 0.35f
+                val spacingVal = stepX * 0.05f
+
+                // Systolic bar
+                val sysPct = item.avgSystolic.toFloat() / maxVal
+                val sysBarHeight = graphHeight * sysPct
+                val sysY = h - paddingBottom - sysBarHeight
+                val sysLeft = x - barWidth - spacingVal
+                val sysRight = x - spacingVal
+                canvas.drawRect(sysLeft, sysY, sysRight, h - paddingBottom, paintSystolic)
+
+                // Diastolic bar
+                val diaPct = item.avgDiastolic.toFloat() / maxVal
+                val diaBarHeight = graphHeight * diaPct
+                val diaY = h - paddingBottom - diaBarHeight
+                val diaLeft = x + spacingVal
+                val diaRight = x + barWidth + spacingVal
+                canvas.drawRect(diaLeft, diaY, diaRight, h - paddingBottom, paintDiastolic)
+
+                // Value labels on top of bars
+                canvas.drawText(item.avgSystolic.toString(), x - barWidth/2 - spacingVal, sysY - dpToPx(3f), paintValText)
+                canvas.drawText(item.avgDiastolic.toString(), x + barWidth/2 + spacingVal, diaY - dpToPx(3f), paintValText)
+            } else {
+                // Draw "空" for missing data
+                canvas.drawText("空", x, h - paddingBottom - graphHeight / 2, paintValText)
+            }
+
+            // Date label
+            canvas.drawText(item.dateLabel, x, h - paddingBottom + dpToPx(18f), paintLabel)
+        }
+    }
+
+    private fun dpToPx(dp: Float): Float = dp * resources.displayMetrics.density
 }

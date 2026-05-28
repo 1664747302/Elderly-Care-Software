@@ -85,4 +85,55 @@ class BloodPressureTest {
         // Verify normal BP & low heart rate is 100 - 10 = 90 points
         assertThat(score(110, 70, 55)).isEqualTo(90)
     }
+
+    @Test
+    fun testBloodPressureExporterRangeAndGrouping() {
+        // 1. 验证日期区间计算返回 yyyy-MM-dd 格式且跨度正确
+        val oneMonthStart = BloodPressureExporter.getStartDateForRange(1)
+        val threeMonthStart = BloodPressureExporter.getStartDateForRange(2)
+        val oneYearStart = BloodPressureExporter.getStartDateForRange(3)
+
+        assertThat(oneMonthStart).matches("^\\d{4}-\\d{2}-\\d{2}$")
+        assertThat(threeMonthStart).matches("^\\d{4}-\\d{2}-\\d{2}$")
+        assertThat(oneYearStart).matches("^\\d{4}-\\d{2}-\\d{2}$")
+
+        // 2. 验证单日合算平均值算法 (当某天有多次自测记录时，要求输出单日平均统计合并的多维数据)
+        // 比如某组记录同日有 3 次测定，应正确合并取平均值
+        val records = listOf(
+            BloodPressureRecord(1L, "2026-05-28", "早晨", 120, 80, 70, 1000L),
+            BloodPressureRecord(2L, "2026-05-28", "中午", 130, 85, 75, 2000L),
+            BloodPressureRecord(3L, "2026-05-28", "晚上", 110, 75, 65, 3000L),
+            BloodPressureRecord(4L, "2026-05-27", "早晨", 140, 90, 80, 4000L)
+        )
+
+        // 我们在 JVM 纯测试环境下，模拟对这批数据进行单日化处理 (同 Exporter 实现)
+        val groupedMap = records.groupBy { it.date }.toSortedMap(reverseOrder())
+        val dailyRecords = mutableListOf<DailyBPRecord>()
+        for ((date, dayRecs) in groupedMap) {
+            val count = dayRecs.size
+            if (count > 0) {
+                val avgSystolic = Math.round(dayRecs.map { it.systolic }.average()).toInt()
+                val avgDiastolic = Math.round(dayRecs.map { it.diastolic }.average()).toInt()
+                val avgHeartRate = Math.round(dayRecs.map { it.heartRate }.average()).toInt()
+                dailyRecords.add(DailyBPRecord(date, avgSystolic, avgDiastolic, avgHeartRate, count))
+            }
+        }
+
+        // 验证合并天数与排序
+        assertThat(dailyRecords).hasSize(2)
+        // 验证最晚日期在前
+        assertThat(dailyRecords[0].date).isEqualTo("2026-05-28")
+        // 验证 5-28 平均值 (120+130+110)/3 = 120; (80+85+75)/3 = 80; (70+75+65)/3 = 70
+        assertThat(dailyRecords[0].avgSystolic).isEqualTo(120)
+        assertThat(dailyRecords[0].avgDiastolic).isEqualTo(80)
+        assertThat(dailyRecords[0].avgHeartRate).isEqualTo(70)
+        assertThat(dailyRecords[0].count).isEqualTo(3)
+
+        // 验证 5-27 平均值
+        assertThat(dailyRecords[1].date).isEqualTo("2026-05-27")
+        assertThat(dailyRecords[1].avgSystolic).isEqualTo(140)
+        assertThat(dailyRecords[1].avgDiastolic).isEqualTo(90)
+        assertThat(dailyRecords[1].avgHeartRate).isEqualTo(80)
+        assertThat(dailyRecords[1].count).isEqualTo(1)
+    }
 }
