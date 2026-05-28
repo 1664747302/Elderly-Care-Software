@@ -116,7 +116,6 @@ object BloodPressureExporter {
             // 标题行和元数据行 (让腾讯文档在预览时有非常整洁的头部引导)
             writer.write("        <tr><td colspan=\"5\" class=\"title-row\" style=\"height:40px;\">老年关怀 · 血压与心率历史自测表</td></tr>\n")
             writer.write("        <tr><td colspan=\"5\" class=\"info-row\">时间跨度：${rangeName} | 导出时间：${exportTimeStr}</td></tr>\n")
-            writer.write("        <tr><td colspan=\"5\" class=\"info-row\">温馨提示：此表格已针对高低压做出了科学判定。您也可以在电脑端使用 Microsoft Excel 完好无损地编辑或打印。</td></tr>\n")
             writer.write("        <tr><td colspan=\"5\" style=\"height:10px;\"></td></tr>\n")
             
             // 表头
