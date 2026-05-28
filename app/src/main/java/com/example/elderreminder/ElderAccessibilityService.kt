@@ -15,7 +15,7 @@ class ElderAccessibilityService : AccessibilityService() {
     private var currentApp: String? = null
     
     // We maintain a list of past usage transition events to pass to raw analyzer
-    private val rawEvents = mutableListOf<UsageSessionEvent>()
+    private val rawEvents = ArrayDeque<UsageSessionEvent>(60)
     
     private val handler = Handler(Looper.getMainLooper())
     private var checkRunnable: Runnable? = null
@@ -80,11 +80,9 @@ class ElderAccessibilityService : AccessibilityService() {
         rawEvents.add(UsageSessionEvent(now, newPkg, UsageSessionEvent.Type.ACTIVITY_RESUMED))
         currentApp = newPkg
 
-        // Clean up history to keep memory footprint bounded (keep only last 100 events)
-        if (rawEvents.size > 100) {
-            val keep = rawEvents.takeLast(50)
-            rawEvents.clear()
-            rawEvents.addAll(keep)
+        // Clean up history to keep memory footprint bounded (keep only last 60 events)
+        while (rawEvents.size > 60) {
+            rawEvents.removeFirst()
         }
 
         if (isLauncherOrSelf) {
@@ -104,7 +102,7 @@ class ElderAccessibilityService : AccessibilityService() {
         val runnable = object : Runnable {
             override fun run() {
                 checkUsageLimit()
-                handler.postDelayed(this, 10000L) // check every 10 seconds
+                handler.postDelayed(this, 30_000L) // check every 30 seconds
             }
         }
         checkRunnable = runnable

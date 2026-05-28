@@ -32,7 +32,7 @@ D:\Project\提醒
 * **添加无障碍服务 `ElderAccessibilityService.kt`**：
   - 精准监听 `AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED` 事件，可以在老人切换应用或返回桌面时，瞬间（秒级）捕获当前交互的前台应用包名。
   - 引入了**防卡bug的休息判定时间间隔算法**：以前老人可以通过快速返回桌面（回到Launcher系统桌面）或瞬间锁屏/亮灭屏来刷新前台应用连续使用计时，从而无限延续手机使用时长卡漏洞。现在，前台监测逻辑在用户返回桌面、锁屏或断开使用时不立刻清除总连续时间，而是维护一个由家人在设置中自定义的短暂休息判定阻尼冷却时长（`restGracePeriodMinutes`，默认 3 分钟）。只有老人真正连续离开非白名单应用、在桌面或处于灭屏状态超过这一休息判定时间阀值，当前的连续使用会话才会被判定为已“彻底断开并完成休息”，使用时间被重置。若在此时间内再次打开手机看微信/刷抖音，应用会自动追溯累加刚才的真实连续使用时长，从而科学无漏洞防沉迷。
-  - 基于 `Handler` 维护了 10 秒级低功耗检测轮询守护计时器（仅在前台运行非系统桌面及非本应用的普通 App 时启动，极大避免后台过度消耗 CPU 和电池消耗）。
+  - 基于 `Handler` 维护了 30 秒级低功耗检测轮询守护计时器（仅在前台运行非系统桌面及非本应用的普通 App 时启动，极大避免后台过度消耗 CPU 和电池消耗）。
   - 支持对亮/灭屏状态的动态监听。注册 `Intent.ACTION_SCREEN_OFF` 广播接收器，当屏幕熄灭或锁屏时自动暂停/清空前台应用计时计数。
   - 自动通过 `packageManager.queryIntentActivities` 动态匹配设备上的系统桌面包名，并在会话判定中智能过滤掉系统桌面和本应用自身，确保不产生误判。
   - 冷却时间机制与原 `UsageReminderWorker.kt` 逻辑深度对齐：区分普通（以常规或在此会话已提醒过的 `repeatedReminderIntervalMinutes` 为准）与夜间宵禁限值（以 2 分钟为限值及冷却阈值）。
@@ -582,3 +582,19 @@ cd D:\elder_reminder_ascii
 
 - 涉及权限、WorkManager、开机广播、通知渠道、TTS、录音、UsageStats 的改动，需要真机验证。
 - 不要提交 `.gradle/`、`.idea/`、`.kotlin/`、`app/build/` 等生成或本地状态目录。
+
+## 内存与电量优化 (2026-05-28)
+
+对无障碍服务与语音提醒模块进行了三处轻量级优化，降低后台 CPU 唤醒频率和内存 GC 压力：
+
+1. **`ElderAccessibilityService.kt` 轮询间隔 10s → 30s**：
+   - 将 `Handler` 守护计时器的检测周期从 10 秒延长至 30 秒，CPU 唤醒次数减少约 67%。
+   - 对老人实际使用体验无影响（提醒触发误差最多增加半分钟）。
+
+2. **`ElderAccessibilityService.kt` rawEvents 改用 `ArrayDeque`**：
+   - 将事件列表从 `mutableListOf` 替换为 `ArrayDeque(60)`，上限从 100 条收紧到 60 条。
+   - 清理策略改为逐个 `removeFirst()`，消除了原有 `takeLast + clear + addAll` 三步操作产生的临时列表对象，减少 GC 抖动。
+
+3. **`SpeechReminder.kt` MediaPlayer 播放完自动释放**：
+   - 新增 `setOnCompletionListener`，录音提醒播放结束后立即调用 `release()` 并将引用置 null。
+   - 避免 `MediaPlayer` 对象在播放结束后继续占用内存直到下次提醒触发。

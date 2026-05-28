@@ -56,6 +56,10 @@ object SpeechReminder : TextToSpeech.OnInitListener {
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(path)
                 prepare()
+                setOnCompletionListener { mp ->
+                    mp.release()
+                    mediaPlayer = null
+                }
                 start()
             }
         } catch (e: Exception) {
